@@ -1,0 +1,80 @@
+{
+  "topics": [
+    {
+      "id": "takaichi",
+      "title": "高市政権",
+      "subItems": [],
+      "user_position_score": 50,
+      "opinions": []
+    },
+    {
+      "id": "tax_usage",
+      "title": "税金の使い道",
+      "subItems": [
+        "防衛費",
+        "医療費",
+        "教育費",
+        "インフラ",
+        "物価高対策",
+        "ガソリン税",
+        "研究費",
+        "国債"
+      ],
+      "user_position_score": 50,
+      "opinions": [
+        {
+          "id": 1,
+          "cluster_name": "防衛費増額派",
+          "summary": "国際情勢の悪化に伴い、防衛費の増額は必須であるという意見。",
+          "position_score": 85,
+          "color": "bg-blue-500",
+          "articles": [
+            {
+              "title": "防衛費増額の是非",
+              "url": "https://example.com/1"
+            },
+            {
+              "title": "日本の安全保障",
+              "url": "https://example.com/2"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "cluster_name": "社会保障優先派",
+          "summary": "少子高齢化対策や医療費・教育費に税金を回すべきという意見。",
+          "position_score": 15,
+          "color": "bg-green-500",
+          "articles": [
+            {
+              "title": "年金問題と税金",
+              "url": "https://example.com/3"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "cluster_name": "現状維持・効率化派",
+          "summary": "増税の前に、現行の無駄遣いを削減し効率化を図るべきという意見。",
+          "position_score": 50,
+          "color": "bg-yellow-500",
+          "articles": []
+        }
+      ]
+    },
+    {
+      "id": "bear",
+      "title": "熊の駆除",
+      "subItems": [],
+      "user_position_score": 50,
+      "opinions": []
+    },
+    {
+      "id": "trump",
+      "title": "トランプ政権",
+      "subItems": [],
+      "user_position_score": 50,
+      "opinions": []
+    }
+  ]
+}
