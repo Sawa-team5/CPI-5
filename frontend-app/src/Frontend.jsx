@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import dummyData from './dummyData.json';
 import { calculateNewScore } from './dummy_backend';
+import ChatMode from './ChatMode';
 
 const Frontend = () => {
   const [currentTheme, setCurrentTheme] = useState(null);
   const [selfScore, setSelfScore] = useState(0);
   const [selectedOpinion, setSelectedOpinion] = useState(null);
   const [themes, setThemes] = useState([]);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
     setThemes(dummyData.themes);
@@ -86,6 +88,19 @@ const Frontend = () => {
           </div>
         </div>
       )}
+
+      {/* Chat Toggle Button */}
+      {!isChatOpen && (
+        <div 
+          style={styles.chatToggle} 
+          onClick={() => setIsChatOpen(true)}
+        >
+          ◀
+        </div>
+      )}
+
+      {/* Chat Mode */}
+      <ChatMode isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </div>
   );
 };
@@ -377,6 +392,26 @@ const styles = {
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
+  },
+  chatToggle: {
+    position: 'fixed',
+    right: 0,
+    top: '50%',
+    transform: 'translateY(-50%)',
+    width: '30px',
+    height: '60px',
+    backgroundColor: '#6c757d',
+    color: 'white',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer',
+    borderTopLeftRadius: '10px',
+    borderBottomLeftRadius: '10px',
+    zIndex: 999,
+    boxShadow: '-2px 0 5px rgba(0,0,0,0.1)',
+    fontSize: '1.2rem',
+    userSelect: 'none',
   }
 };
 
