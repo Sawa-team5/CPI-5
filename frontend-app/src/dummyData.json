@@ -1,0 +1,34 @@
+{
+  "themes": [
+    {
+      "id": "theme1",
+      "title": "高市政権",
+      "color": "#E57373",
+      "opinions": [
+        { "id": "op1", "title": "積極財政", "body": "国債を発行して投資を増やすべき。経済成長には不可欠な要素である。", "score": 80, "color": "#EF9A9A", "sourceUrl": "https://example.com/news/fiscal-policy" },
+        { "id": "op2", "title": "靖国参拝", "body": "国のリーダーとして英霊に尊崇の念を表すべき。", "score": 90, "color": "#EF9A9A", "sourceUrl": "https://example.com/news/yasukuni" },
+        { "id": "op1_neg", "title": "財政規律", "body": "将来世代へのツケを回すべきではない。緊縮財政が必要。", "score": -70, "color": "#B0BEC5", "sourceUrl": "https://example.com/news/fiscal-discipline" }
+      ]
+    },
+    {
+      "id": "theme2",
+      "title": "熊の駆除",
+      "color": "#FFD54F",
+      "opinions": [
+        { "id": "op3", "title": "意見1", "body": "人命優先で駆除すべき。被害が出ている以上、躊躇すべきではない。", "score": -80, "color": "#FDD835", "sourceUrl": "https://example.com/news/bear-control" },
+        { "id": "op4", "title": "意見2", "body": "共存の道を探るべき。むやみな駆除は生態系を破壊する。", "score": 60, "color": "#81C784", "sourceUrl": "https://example.com/news/bear-coexistence" },
+        { "id": "op5", "title": "意見3", "body": "ハンターへの補助金を増やす。担い手不足を解消するのが先決。", "score": -20, "color": "#7986CB", "sourceUrl": "https://example.com/news/hunter-subsidy" }
+      ]
+    },
+    {
+      "id": "theme3",
+      "title": "トランプ政権",
+      "color": "#81C784",
+      "opinions": [
+        { "id": "op6", "title": "関税強化", "body": "自国産業を守るため関税を上げる。アメリカファースト。", "score": 70, "color": "#A5D6A7", "sourceUrl": "https://example.com/news/tariff-hike" },
+        { "id": "op7", "title": "移民政策", "body": "国境管理を厳格化し、不法移民を強制送還すべき。", "score": 80, "color": "#A5D6A7", "sourceUrl": "https://example.com/news/immigration-control" },
+        { "id": "op8", "title": "国際協調", "body": "孤立主義は世界経済に悪影響を与える。", "score": -60, "color": "#90CAF9", "sourceUrl": "https://example.com/news/global-cooperation" }
+      ]
+    }
+  ]
+}
