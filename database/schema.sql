@@ -11,40 +11,51 @@ CREATE TABLE users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ニューステーブル （仮 やりやすいように変更してください）
-CREATE TABLE news (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  topic_name VARCHAR(10) NOT NULL,
-  summary VARCHAR(100) NOT NULL,
-  url TEXT,
-  agree_score FLOAT NOT NULL DEFAULT 0.0,
+-- テーマテーブル
+CREATE TABLE themes (
+  id TEXT PRIMARY KEY,
+  title VARCHAR(100) NOT NULL,
+  color VARCHAR(20) NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- ユーザーの立場スコアテーブル
+-- 意見テーブル（opinions）
+CREATE TABLE opinions (
+  id TEXT PRIMARY KEY,
+  theme_id TEXT REFERENCES themes(id) ON DELETE CASCADE,
+  title VARCHAR(100) NOT NULL,
+  body TEXT NOT NULL,
+  score FLOAT NOT NULL CHECK (score >= -100 AND score <= 100),
+  color VARCHAR(20) NOT NULL,
+  source_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ユーザーの立場スコアテーブル (各テーマに対する全体スコア)
 CREATE TABLE user_stances (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  news_id UUID REFERENCES news(id) ON DELETE CASCADE,
-  stance_score FLOAT NOT NULL DEFAULT 0.0,
+  theme_id TEXT REFERENCES themes(id) ON DELETE CASCADE,
+  stance_score FLOAT NOT NULL DEFAULT 0.0 CHECK (stance_score >= -100 AND stance_score <= 100),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  UNIQUE(user_id, news_id)
+  UNIQUE(user_id, theme_id)
 );
 
--- ユーザーの意見アクションテーブル（賛成/反対の履歴）一応保存
-CREATE TABLE user_actions (
+-- ユーザーの投票履歴テーブル（賛成/反対の履歴）
+CREATE TABLE user_votes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id) ON DELETE CASCADE,
-  news_id UUID REFERENCES news(id) ON DELETE CASCADE,
-  action_type VARCHAR(20) NOT NULL, -- 'agree' or 'disagree'
-  opinion_stance FLOAT NOT NULL,
+  opinion_id TEXT REFERENCES opinions(id) ON DELETE CASCADE,
+  vote_type VARCHAR(20) NOT NULL, -- 'agree' or 'oppose'
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- インデックス作成
+CREATE INDEX idx_opinions_theme_id ON opinions(theme_id);
 CREATE INDEX idx_user_stances_user_id ON user_stances(user_id);
-CREATE INDEX idx_user_stances_news_id ON user_stances(news_id);
-CREATE INDEX idx_user_actions_user_id ON user_actions(user_id);
-CREATE INDEX idx_user_actions_news_id ON user_actions(news_id);
+CREATE INDEX idx_user_stances_theme_id ON user_stances(theme_id);
+CREATE INDEX idx_user_votes_user_id ON user_votes(user_id);
+CREATE INDEX idx_user_votes_opinion_id ON user_votes(opinion_id);
