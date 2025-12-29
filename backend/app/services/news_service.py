@@ -1,6 +1,6 @@
 # ============================================
-# ニュース関連サービス
-# ニュースの取得、作成、ユーザーの立場スコア計算を担当
+# テーマと意見関連サービス
+# テーマと意見の取得、作成、ユーザーの立場スコア計算を担当
 # ============================================
 
 from typing import List, Dict, Any, Optional
@@ -9,149 +9,179 @@ from app.utils.logger import logger
 
 
 class NewsService:
-    """ニュース関連のビジネスロジックを提供するサービスクラス"""
+    """テーマと意見関連のビジネスロジックを提供するサービスクラス"""
     
     def __init__(self):
         self.supabase = get_supabase()
     
-    async def get_all_news(self) -> List[Dict[str, Any]]:
-        """
-        全てのニュースを取得する
+    # async def get_all_themes(self) -> List[Dict[str, Any]]:
+    #     """
+    #     全てのテーマと意見を取得する（フロントエンドのJSON構造に合わせる）
         
-        Returns:
-            ニュースのリスト
-        """
-        try:
-            result = self.supabase.table("news").select("*").order("created_at", desc=True).execute()
-            return result.data if result.data else []
+    #     Returns:
+    #         テーマのリスト（各テーマに意見が含まれる）
+    #     """
+    #     try:
+    #         # テーマを取得
+    #         themes_result = self.supabase.table("themes").select("*").order("created_at", desc=False).execute()
+    #         themes = themes_result.data if themes_result.data else []
             
-        except Exception as e:
-            logger.error(f"ニュース取得エラー: {str(e)}")
-            raise
+    #         # 各テーマに対して意見を取得
+    #         for theme in themes:
+    #             opinions_result = self.supabase.table("opinions").select("*").eq("theme_id", theme["id"]).execute()
+    #             opinions = opinions_result.data if opinions_result.data else []
+                
+    #             # キー名をフロントエンドに合わせる (source_url -> sourceUrl)
+    #             for opinion in opinions:
+    #                 opinion["sourceUrl"] = opinion.pop("source_url", None)
+                
+    #             theme["opinions"] = opinions
+            
+    #         return themes
+            
+    #     except Exception as e:
+    #         logger.error(f"テーマ取得エラー: {str(e)}")
+    #         raise
     
-    async def get_news_by_id(self, news_id: str) -> Optional[Dict[str, Any]]:
-        """
-        特定のニュースを取得する
+    # async def get_theme_by_id(self, theme_id: str) -> Optional[Dict[str, Any]]:
+    #     """
+    #     特定のテーマとその意見を取得する
         
-        Args:
-            news_id: ニュースID
+    #     Args:
+    #         theme_id: テーマID
             
-        Returns:
-            ニュース情報
-        """
-        try:
-            result = self.supabase.table("news").select("*").eq("id", news_id).execute()
-            return result.data[0] if result.data else None
+    #     Returns:
+    #         テーマ情報（意見を含む）
+    #     """
+    #     try:
+    #         # テーマを取得
+    #         theme_result = self.supabase.table("themes").select("*").eq("id", theme_id).execute()
+    #         if not theme_result.data:
+    #             return None
             
-        except Exception as e:
-            logger.error(f"ニュース取得エラー: {str(e)}")
-            raise
+    #         theme = theme_result.data[0]
+            
+    #         # 意見を取得
+    #         opinions_result = self.supabase.table("opinions").select("*").eq("theme_id", theme_id).execute()
+    #         opinions = opinions_result.data if opinions_result.data else []
+            
+    #         # キー名をフロントエンドに合わせる
+    #         for opinion in opinions:
+    #             opinion["sourceUrl"] = opinion.pop("source_url", None)
+            
+    #         theme["opinions"] = opinions
+    #         return theme
+            
+    #     except Exception as e:
+    #         logger.error(f"テーマ取得エラー: {str(e)}")
+    #         raise
     
-    async def create_news(self, topic_name: str, summary: str, url: str, agree_score: float) -> Dict[str, Any]:
+    async def get_user_stance(self, user_id: str, theme_id: str) -> Optional[Dict[str, Any]]:
         """
-        新しいニュースを作成する
-        
-        Args:
-            topic_name: トピック名（10文字以内）
-            summary: まとめ（100文字以内）
-            url: ニュースのURL
-            agree_score: 賛成スコア
-            
-        Returns:
-            作成されたニュース情報
-        """
-        try:
-            result = self.supabase.table("news").insert({
-                "topic_name": topic_name[:10],  # 10文字に制限
-                "summary": summary[:100],  # 100文字に制限
-                "url": url,
-                "agree_score": agree_score
-            }).execute()
-            
-            logger.info(f"新規ニュース作成: {topic_name}")
-            return result.data[0] if result.data else {}
-            
-        except Exception as e:
-            logger.error(f"ニュース作成エラー: {str(e)}")
-            raise
-    
-    async def get_user_stance(self, user_id: str, news_id: str) -> Optional[Dict[str, Any]]:
-        """
-        ユーザーの特定ニュースに対する立場スコアを取得
+        ユーザーの特定テーマに対する立場スコアを取得
         
         Args:
             user_id: ユーザーID
-            news_id: ニュースID
+            theme_id: テーマID
             
         Returns:
             立場スコア情報
         """
         try:
-            result = self.supabase.table("user_stances").select("*").eq("user_id", user_id).eq("news_id", news_id).execute()
+            result = self.supabase.table("user_stances").select("*").eq("user_id", user_id).eq("theme_id", theme_id).execute()
             return result.data[0] if result.data else None
             
         except Exception as e:
             logger.error(f"立場スコア取得エラー: {str(e)}")
             raise
     
-    async def get_all_user_stances(self, user_id: str) -> List[Dict[str, Any]]:
+    # async def get_all_user_stances(self, user_id: str) -> List[Dict[str, Any]]:
+    #     """
+    #     ユーザーの全テーマに対する立場スコアを取得
+        
+    #     Args:
+    #         user_id: ユーザーID
+            
+    #     Returns:
+    #         立場スコアのリスト
+    #     """
+    #     try:
+    #         result = self.supabase.table("user_stances").select("*, themes(*)").eq("user_id", user_id).execute()
+    #         return result.data if result.data else []
+            
+    #     except Exception as e:
+    #         logger.error(f"立場スコア取得エラー: {str(e)}")
+    #         raise
+    
+    def calculate_new_score(self, current_self_score: float, opinion_score: float, vote_type: str) -> float:
         """
-        ユーザーの全ニュースに対する立場スコアを取得
+        ユーザースコアを計算
         
         Args:
-            user_id: ユーザーID
+            current_self_score: 現在のユーザースコア (-100 ~ 100)
+            opinion_score: 意見のスコア (-100 ~ 100)
+            vote_type: 投票タイプ ('agree' または 'oppose')
             
         Returns:
-            立場スコアのリスト
+            新しいスコア (-100 ~ 100)
         """
-        try:
-            result = self.supabase.table("user_stances").select("*, news(*)").eq("user_id", user_id).execute()
-            return result.data if result.data else []
-            
-        except Exception as e:
-            logger.error(f"立場スコア取得エラー: {str(e)}")
-            raise
+        weight = 0.2  # 移動の重み
+        
+        if vote_type == 'agree':
+            # 意見の方向に寄せる
+            new_score = current_self_score + (opinion_score - current_self_score) * weight
+        elif vote_type == 'oppose':
+            # 意見の反対方向に寄せる
+            # 意見が正（例: 80）なら、反対すると負の方向に移動
+            # 意見が負（例: -80）なら、反対すると正の方向に移動
+            target_score = -opinion_score
+            new_score = current_self_score + (target_score - current_self_score) * weight
+        else:
+            new_score = current_self_score
+        
+        # スコアを -100 ~ 100 の範囲に制限
+        new_score = max(-100, min(100, new_score))
+        
+        return new_score
     
     async def update_stance_score(
         self, 
         user_id: str, 
-        news_id: str, 
-        action_type: str, 
-        opinion_stance: float
+        opinion_id: str, 
+        vote_type: str
     ) -> Dict[str, Any]:
         """
         ユーザーの立場スコアを更新する
-        賛成/反対アクションに基づいてスコアを計算
+        賛成/反対投票に基づいてスコアを計算（dummy_backend.jsxのアルゴリズムを使用）
         
         Args:
             user_id: ユーザーID
-            news_id: ニュースID
-            action_type: アクションタイプ（'agree' または 'disagree'）
-            opinion_stance: 意見の立場スコア (-1.0 ~ 1.0)
+            opinion_id: 意見ID
+            vote_type: 投票タイプ（'agree' または 'oppose'）
             
         Returns:
             更新された立場スコア情報
         """
         try:
+            # 意見を取得してテーマIDとスコアを確認
+            opinion_result = self.supabase.table("opinions").select("*").eq("id", opinion_id).execute()
+            if not opinion_result.data:
+                raise ValueError(f"Opinion not found: {opinion_id}")
+            
+            opinion = opinion_result.data[0]
+            theme_id = opinion["theme_id"]
+            opinion_score = opinion["score"]
+            
             # 現在の立場スコアを取得
-            current_stance = await self.get_user_stance(user_id, news_id)
+            current_stance = await self.get_user_stance(user_id, theme_id)
             
             if current_stance:
                 current_score = current_stance["stance_score"]
             else:
                 current_score = 0.0
             
-            # 新しいスコアを計算
-            # 賛成の場合：意見の方向に寄せる
-            # 反対の場合：意見の反対方向に寄せる
-            if action_type == "agree":
-                new_score = (current_score * 2 + opinion_stance) / 3
-            else:  # disagree
-                opposite_stance = -opinion_stance
-                new_score = (current_score * 2 + opposite_stance) / 3
-            
-            # スコアを-1.0~1.0の範囲に制限
-            new_score = max(-1.0, min(1.0, new_score))
+            # 新しいスコアを計算（dummy_backend.jsxのアルゴリズム）
+            new_score = self.calculate_new_score(current_score, opinion_score, vote_type)
             
             # データベースを更新または挿入
             if current_stance:
@@ -161,76 +191,26 @@ class NewsService:
             else:
                 result = self.supabase.table("user_stances").insert({
                     "user_id": user_id,
-                    "news_id": news_id,
+                    "theme_id": theme_id,
                     "stance_score": new_score
                 }).execute()
             
-            # アクション履歴を記録
-            self.supabase.table("user_actions").insert({
+            # 投票履歴を記録
+            self.supabase.table("user_votes").insert({
                 "user_id": user_id,
-                "news_id": news_id,
-                "action_type": action_type,
-                "opinion_stance": opinion_stance
+                "opinion_id": opinion_id,
+                "vote_type": vote_type
             }).execute()
             
-            logger.info(f"立場スコア更新: user={user_id}, news={news_id}, score={new_score}")
-            return result.data[0] if result.data else {}
+            logger.info(f"立場スコア更新: user={user_id}, theme={theme_id}, opinion={opinion_id}, score={new_score}")
+            
+            # レスポンスにnewScoreを含める（フロントエンドの期待に合わせる）
+            response = result.data[0] if result.data else {}
+            response["newScore"] = new_score
+            return response
             
         except Exception as e:
             logger.error(f"立場スコア更新エラー: {str(e)}")
-            raise
-    
-    async def update_stance_with_conviction(
-        self,
-        user_id: str,
-        news_id: str,
-        conviction_rating: int
-    ) -> Dict[str, Any]:
-        """
-        納得度評価に基づいて立場スコアを微調整
-        
-        Args:
-            user_id: ユーザーID
-            news_id: ニュースID
-            conviction_rating: 納得度 (1: あまり納得しなかった, 2: やや納得した, 3: とても納得した)
-            
-        Returns:
-            更新された立場スコア情報
-        """
-        try:
-            current_stance = await self.get_user_stance(user_id, news_id)
-            
-            if not current_stance:
-                raise Exception("立場スコアが存在しません")
-            
-            current_score = current_stance["stance_score"]
-            
-            # 納得度に応じてスコアを微調整
-            # 1: スコアを0方向に10%戻す（あまり納得しなかった）
-            # 2: スコアを維持（やや納得した）
-            # 3: スコアを現在の方向に10%強める（とても納得した）
-            if conviction_rating == 1:
-                adjustment_factor = 0.9
-                new_score = current_score * adjustment_factor
-            elif conviction_rating == 2:
-                new_score = current_score  # 変更なし
-            else:  # conviction_rating == 3
-                adjustment_factor = 1.1
-                new_score = current_score * adjustment_factor
-            
-            # スコアを-1.0~1.0の範囲に制限
-            new_score = max(-1.0, min(1.0, new_score))
-            
-            # データベースを更新
-            result = self.supabase.table("user_stances").update({
-                "stance_score": new_score
-            }).eq("id", current_stance["id"]).execute()
-            
-            logger.info(f"納得度による立場スコア更新: user={user_id}, news={news_id}, rating={conviction_rating}, score={new_score}")
-            return result.data[0] if result.data else {}
-            
-        except Exception as e:
-            logger.error(f"納得度更新エラー: {str(e)}")
             raise
 
 
