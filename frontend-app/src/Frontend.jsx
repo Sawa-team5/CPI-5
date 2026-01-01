@@ -11,7 +11,11 @@ const Frontend = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
-    setThemes(dummyData.themes);
+    // setThemes(dummyData.themes); UNCOMMENT TO USE DUMMY DATA
+      fetch("/api/themes")
+      .then(r => r.json())
+      .then(json => setData(json.themes))
+      .catch(console.error);
   }, []);
 
   const handleThemeClick = (theme) => {
