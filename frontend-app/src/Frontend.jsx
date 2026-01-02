@@ -11,11 +11,19 @@ const Frontend = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
 
   useEffect(() => {
-    // setThemes(dummyData.themes); UNCOMMENT TO USE DUMMY DATA
-      fetch("/api/themes")
-      .then(r => r.json())
-      .then(json => setData(json.themes))
-      .catch(console.error);
+    fetch("/api/themes")
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(json => {
+        const backendThemes = json?.themes ?? [];
+        setThemes(backendThemes.length > 0 ? backendThemes : dummyData.themes);
+      })
+      .catch(err => {
+        console.error("Failed to fetch themes, using dummyData:", err);
+        setThemes(dummyData.themes);
+      });
   }, []);
 
   const handleThemeClick = (theme) => {
