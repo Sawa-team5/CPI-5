@@ -1,13 +1,24 @@
-# メモ
+# メモ（backend）
 
-### 1. 依存関係のインストール
+（デバッグのために余計なところまで実装しています。マージ時に削除・修正するので無視してください。）
+
+実装機能（現状）：
+- **ユーザー登録/ログイン（ニックネーム）**
+- **テーマ（themes）配下の意見（opinions）に対する投票（agree/oppose）**
+- **投票に応じたユーザー立場スコア（user_stances）の更新**
+- **Supabase を DB として利用**
+
+## セットアップ
+
+### 依存関係のインストール
 
 ```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-### 4. サーバー起動
+
+### サーバー起動
 
 ```bash
 cd backend
@@ -16,118 +27,129 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 サーバーは http://localhost:8000 で起動します。
 
-
-
 ## 🔌 API エンドポイント
-
-### ユーザー認証
 
 ベースURL: `http://localhost:8000/api`
 
-#### 1. ユーザー登録
+### Users
+
+#### ユーザー登録
 
 ```http
 POST /api/users/register
 Content-Type: application/json
 
 {
-  "nickname": "ユーザー名"
+  "nickname": "alice"
 }
 ```
 
-**レスポンス例（成功）:**
-```json
-{
-  "success": true,
-  "user": {
-    "id": "uuid",
-    "nickname": "ユーザー名",
-    "created_at": "2025-12-19T10:00:00Z",
-    "updated_at": "2025-12-19T10:00:00Z"
-  },
-  "message": "ユーザー 'ユーザー名' を登録しました"
-}
-```
-
-**エラー例（重複）:**
-```json
-{
-  "detail": "このニックネームは既に使用されています"
-}
-```
-
-#### 2. ユーザーログイン
+#### ログイン
 
 ```http
 POST /api/users/login
 Content-Type: application/json
 
 {
-  "nickname": "ユーザー名"
+  "nickname": "alice"
 }
 ```
 
-**レスポンス例（成功）:**
-```json
-{
-  "success": true,
-  "user": {
-    "id": "uuid",
-    "nickname": "ユーザー名",
-    "created_at": "2025-12-19T10:00:00Z",
-    "updated_at": "2025-12-19T10:00:00Z"
-  },
-  "message": "ようこそ、ユーザー名さん"
-}
-```
-
-**エラー例（未登録）:**
-```json
-{
-  "detail": "ユーザーが見つかりません"
-}
-```
-
-#### 3. ユーザー情報取得
+#### ユーザー情報取得
 
 ```http
 GET /api/users/{user_id}
 ```
 
-**レスポンス例:**
-```json
+### News（実態は「テーマ/意見 + 立場スコア」）
+
+#### 投票（賛成/反対）→ 立場スコア更新
+
+フロントエンドの `handleVote` から呼ばれる想定の形です。
+
+```http
+POST /api/news/vote
+Content-Type: application/json
+
 {
-  "success": true,
-  "user": {
-    "id": "uuid",
-    "nickname": "ユーザー名",
-    "created_at": "2025-12-19T10:00:00Z",
-    "updated_at": "2025-12-19T10:00:00Z"
-  }
+  "currentScore": 0,
+  "opinionId": "opinion-1",
+  "voteType": "agree"  
 }
 ```
 
-### 認証フロー
+- `voteType` は `'agree'` または `'oppose'`
+- `currentScore` は現状リクエストに含まれますが、サーバー側の計算には未使用です
+- 現状の実装ではユーザーIDは固定（`test-user-id`）になっています（認証導入後に置き換え予定）
 
-1. **新規ユーザー:**
-   - `/api/users/register` でニックネーム登録
-   - 成功したら `user.id` をローカルストレージに保存
+**レスポンス例:**
 
-2. **既存ユーザー:**
-   - `/api/users/login` でログイン
-   - 成功したら `user.id` をローカルストレージに保存
+```json
+{
+  "newScore": 16.0
+}
+```
 
-3. **ユーザー情報の取得:**
-   - 保存した `user.id` を使って `/api/users/{user_id}` で情報を取得可能
+#### ユーザーの立場スコア取得（テーマ単位）
 
-### CORS設定
+```http
+GET /api/news/stance/{user_id}/{theme_id}
+```
 
-開発環境では全てのオリジンからのリクエストを許可しています。
-フロントエンドから直接APIを呼び出せます。
+立場が未作成の場合は `{ "stance_score": 0.0 }` 相当の初期値を返します。
 
-### エラーハンドリング
+### AI
 
-- HTTPステータス 200: 成功
-- HTTPステータス 400: バリデーションエラー（ニックネーム重複など）
-- HTTPステータス 404: リソースが見つからない（ユーザー未登録など）
-- HTTPステータス 500: サーバーエラー
+#### チャット（仮）
+
+現状はダミーで `{"response": "testing"}` を返します。
+
+```http
+POST /api/ai/chat?prompt=hello
+```
+
+## 📈 スコア計算ロジック（現状）
+
+- 意見スコア（`opinions.score`）とユーザースコア（`user_stances.stance_score`）の範囲は **-100〜100**
+- 重み `weight = 0.2`
+  - `agree`: 意見の方向へ寄せる
+  - `oppose`: 意見の「反対方向」へ寄せる（`target = -opinion_score`）
+- 結果は **-100〜100** にクリップ
+
+## 🗄️ データベーステーブル（Supabase）
+
+スキーマは `database/schema.sql` を参照してください。
+
+### users
+- `id`: UUID
+- `nickname`: VARCHAR(50) UNIQUE
+
+### themes
+- `id`: TEXT
+- `title`: VARCHAR(100)
+- `color`: VARCHAR(20)
+
+### opinions
+- `id`: TEXT
+- `theme_id`: TEXT (FK → themes.id)
+- `title`: VARCHAR(100)
+- `body`: TEXT
+- `score`: FLOAT (-100〜100)
+- `source_url`: TEXT
+
+### user_stances
+- `id`: UUID
+- `user_id`: UUID (FK → users.id)
+- `theme_id`: TEXT (FK → themes.id)
+- `stance_score`: FLOAT (-100〜100)
+- UNIQUE制約: (user_id, theme_id)
+
+### user_votes
+- `id`: UUID
+- `user_id`: UUID (FK → users.id)
+- `opinion_id`: TEXT (FK → opinions.id)
+- `vote_type`: VARCHAR(20) ('agree' or 'oppose')
+
+## CORS設定
+
+現状は `app/main.py` 側で `allow_origins=["*"]` としており、開発環境では全てのオリジンからのリクエストを許可しています。
