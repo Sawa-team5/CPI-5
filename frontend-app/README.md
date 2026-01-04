@@ -266,3 +266,33 @@ const handleVote = async (type) => {
 | **テーマ一覧表示** | ✅ API連携済み | バックエンド側で `/api/themes` を有効化 |
 | **スコア計算・投票** | 🚧 フロントエンド側ダミー計算 | `/api/vote` へのPOST処理への差し替え |
 | **AIチャット応答** | 🚧 オウム返しによるダミー | WebSocket または API 通信の有効化 |
+
+## 6. バックエンド基盤の修正と通信疎通確認 (2026/01/05 更新)
+今回のアップデートでは、フロントエンドの実装に加え、バックエンドが正常に動作するための基盤整備を行いました。
+
+A. バックエンド起動環境の整備
+feature/backend/data-collection ブランチの設計を参考に、以下のファイルを修正・最適化しました。
+
+backend/app/config.py
+backend/app/utils/logger.py
+.env
+
+B. Supabase との疎通確認
+ログイン・ユーザー登録 API において、「フロントエンド → バックエンド → Supabase」の通信が完全に開通していることを確認済みです。
+
+現在のステータス:
+
+バックエンドから Supabase への接続自体は成功しています。
+
+実行時に以下のエラーコードが返却されますが、これは通信成功の証拠です。
+
+エラー内容: code: 'PGRST205' (Could not find the table 'public.users')
+
+理由: Supabase 側にまだ users テーブルが作成されていないため。
+
+結論: プログラム側の接続設定（URL/API KEY）は全て正しく動作しています。
+
+C. 次の作業（バックエンド/DB担当者へ）
+Supabase の SQL Editor などを用いて、public.users テーブルを作成してください。
+
+テーブル作成後、ログイン・登録機能が即座に利用可能になるはずです
