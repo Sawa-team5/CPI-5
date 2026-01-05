@@ -52,11 +52,23 @@ const Frontend = ({ onLoginClick }) => {
     setSelectedOpinion(opinion);
   };
 
-  const handleVote = (type) => {
+  const handleVote = async (type) => {
     if (!selectedOpinion) return;
-    const newScore = calculateNewScore(selfScore, selectedOpinion.score, type);
-    setSelfScore(newScore);
-    setSelectedOpinion(null);
+    try {
+      const newScore = await calculateNewScore(selfScore, selectedOpinion.id, type);
+      setSelfScore(newScore);
+      setSelectedOpinion(null);
+    } catch (error) {
+      console.warn('Vote failed:', error);
+      // ユーザーにエラーメッセージを表示
+      if (error.message.includes('ログイン')) {
+        alert('ログインが必要です。ログインしてください。');
+      } else {
+        alert(`投票に失敗しました: ${error.message}`);
+      }
+      // エラーが発生してもselectedOpinionをクリアしてUIを継続可能にする
+      setSelectedOpinion(null);
+    }
   };
 
   return (
