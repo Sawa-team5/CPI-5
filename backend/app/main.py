@@ -1,6 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.api import api_router
+# from app.config import CORS_ORIGINS
+from app.services.supabase_service import init_supabase
 
 app = FastAPI(title="Kaleidoscope Backend")
 
@@ -14,6 +17,8 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"]
 )
+
+init_supabase()
 
 app.include_router(api_router, prefix="/api")
 

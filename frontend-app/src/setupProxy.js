@@ -1,0 +1,22 @@
+const { createProxyMiddleware } = require("http-proxy-middleware");
+
+module.exports = function (app) {
+  app.use(
+    "/api",
+    createProxyMiddleware({
+      target: "http://localhost:8000",
+      changeOrigin: true,
+      logLevel: "debug",
+      pathRewrite: (path) => "/api" + path,
+    })
+  );
+
+  app.use(
+    "/chat",
+    createProxyMiddleware({
+      target: "http://localhost:8000",
+      changeOrigin: true,
+      logLevel: "debug",
+    })
+  );
+};

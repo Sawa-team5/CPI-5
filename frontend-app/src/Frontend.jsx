@@ -18,7 +18,7 @@ const Frontend = ({ onLoginClick }) => {
       setNickname(storedNickname);
     }
 
-    fetch("/api/themes")
+    fetch("/api/themes/")
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
@@ -181,8 +181,8 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => (
             }}
             onClick={() => onOpinionClick(op)}
           >
-            <div style={{fontWeight: 'bold'}}>{op.title}</div>
-            <div style={{fontSize: '0.8rem', marginTop: '5px'}}>ID: {op.id}</div>
+            <div style={{ fontWeight: 'bold', lineHeight: '1.2' }}>{op.title}
+            </div>
           </div>
         );
       })}
