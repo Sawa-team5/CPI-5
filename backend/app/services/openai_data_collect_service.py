@@ -6,6 +6,8 @@ import hashlib
 from typing import Optional, List, Tuple
 from urllib.parse import urlparse
 from collections import Counter
+from dataclasses import dataclass
+import re
 
 from pydantic import BaseModel, Field, HttpUrl, ValidationError
 from openai import OpenAI
@@ -14,13 +16,66 @@ from app.config import OPENAI_API_KEY, TOPIC_CARDS_MODEL
 from app.services.diversity_pick import pick_diverse_items
 
 class CollectedItem(BaseModel):
-    topic_name: str = Field(max_length=10)
+    topic_name: str = Field(max_length=15)
     summary: str = Field(max_length=100)
     url: HttpUrl
     agreement_score: int = Field(ge=-100, le=100)
 
 class CollectedItems(BaseModel):
     items: List[CollectedItem]
+
+@dataclass(frozen=True)
+class ThemeProfile:
+    scoring_target: str
+    viewpoint_examples: Optional[List[str]] = None
+    force_positions: Optional[List[str]] = None
+
+def _normalize_topic_key(s: str) -> str:
+    # 入力ゆれ（全角/半角スペース等）に強くする
+    s = s.strip()
+    s = re.sub(r"\s+", "", s)
+    return s
+
+THEME_PROFILES: dict[str, ThemeProfile] = {
+    _normalize_topic_key("熊の駆除"): ThemeProfile(
+        scoring_target="『熊の駆除（捕獲）を拡大すべき』に賛成=+100、反対=-100",
+        viewpoint_examples=[
+            "人身被害・住民の安全",
+            "農作物被害・補償",
+            "生態系・保護・共存",
+            "捕獲の担い手（猟友会）・安全・コスト",
+            "再発防止（電気柵・餌管理・監視）",
+            "法制度・運用（捕獲基準、自治体対応）",
+        ],
+    ),
+    _normalize_topic_key("高市政権"): ThemeProfile(
+        scoring_target="『高市政権は日本にとって望ましい』に賛成=+100、反対=-100",
+        viewpoint_examples=[
+            "経済政策（成長・財政・インフレ）",
+            "安全保障・外交",
+            "エネルギー政策（原発・再エネ）",
+            "社会政策（教育・少子化）",
+            "政治姿勢（統治、説明責任、分断）",
+            "憲法・法制度の方向性",
+        ],
+    ),
+    _normalize_topic_key("トランプ政権"): ThemeProfile(
+        scoring_target="『トランプ政権（再登場含む）の政策・影響は総合的にプラスである』に賛成=+100、反対=-100",
+        viewpoint_examples=[
+            "経済（雇用・減税・関税）",
+            "移民・国境政策",
+            "外交・同盟（NATO、対中、対ロ）",
+            "司法・民主主義（制度への影響）",
+            "気候・エネルギー政策",
+            "社会の分断・治安",
+        ],
+        force_positions=[
+            "肯定・支持の立場（２件）",
+            "批判・否定の立場（２件）",
+            "中立・評価が分かれる立場（２件）",
+        ],
+    ),
+}
 
 TOPIC_CARDS_JSON_SCHEMA = {
     "type": "object",
@@ -32,7 +87,7 @@ TOPIC_CARDS_JSON_SCHEMA = {
             "items": {
                 "type": "object",
                 "properties": {
-                    "topic_name": {"type": "string", "maxLength": 10},
+                    "topic_name": {"type": "string", "maxLength": 15},
                     "summary": {"type": "string", "maxLength": 100},
                     "url": {"type": "string"},
                     "agreement_score": {
@@ -60,28 +115,43 @@ def _domain(u: str) -> str:
         d = d[4:]
     return d
 
-def _postprocess_items(items: CollectedItems, min_sources: int, max_per_url: int) -> Tuple[CollectedItems, int, int]:
-    """
-    Returns: (filtered_items, unique_domain_count, kept_count)
-    - caps same-URL items to max_per_url
-    - counts unique domains after filtering
-    """
-    url_counts = Counter()
-    filtered: List[CollectedItem] = []
+def _build_prompt(
+    topic: str,
+    max_items: int,
+    theme_statement: str | None,
+    min_sources: int,
+    max_per_url: int,
+) -> str:
+    key = _normalize_topic_key(topic)
+    profile = THEME_PROFILES.get(key)
 
-    for it in items.items:
-        u = str(it.url)
-        if url_counts[u] >= max_per_url:
-            continue
-        url_counts[u] += 1
-        filtered.append(it)
+    scoring_target = (
+        theme_statement
+        or (profile.scoring_target if profile else None)
+        or f"『{topic}』に対して肯定的=+100、否定的=-100"
+    )
 
-    filtered_items = CollectedItems(items=filtered)
-    domains = {_domain(str(it.url)) for it in filtered_items.items}
-    return filtered_items, len(domains), len(filtered_items.items)
+    viewpoints_block = ""
+    if profile and profile.viewpoint_examples:
+        bullets = "\n".join([f"- {v}" for v in profile.viewpoint_examples])
+        viewpoints_block = f"\n# 論点リスト（例）\n{bullets}\n"
 
-def _build_prompt(topic: str, max_items: int, theme_statement: Optional[str], min_sources: int, max_per_url: int) -> str:
-    scoring_target = theme_statement or f"『{topic}』に肯定的か否定的か（肯定=+100, 否定=-100）"
+    force_block = ""
+    if profile and profile.force_positions:
+        bullets = "\n".join([f"- {p}" for p in profile.force_positions])
+        force_block = f"""
+        重要（必須）：
+        以下の立場を必ずすべて含めること。
+        記事数が少ない場合でも、対応する論点を探し、必ず生成すること。
+
+        {bullets}
+
+        agreement_score の割り当て：
+        - 肯定・支持： +40〜+90
+        - 中立・評価が分かれる： -10〜+10
+        - 批判・否定： -40〜-90
+        """
+
 
     return f"""
         あなたはニュース調査アシスタントです。Web検索を使い、記事に基づいて items を作成してください。
@@ -98,31 +168,26 @@ def _build_prompt(topic: str, max_items: int, theme_statement: Optional[str], mi
 
         # ハード制約（必ず守る）
         - URLは実在する記事URL（検索で見つかったもののみ）
-        - topic_name: 10字以内（主張ラベル）
-        - summary: 100字以内（日本語、記事の要点）
+        - topic_name:
+        記事が扱う具体的な論点・観点を表す短い日本語フレーズ。
+        「賛成」「反対」「中立」など立場ラベルは禁止。
+        - topic_name: 15字以内
+        - summary: 100字以内（日本語、記事の要点、「である調」の断定文にする）
         - agreement_score: -100〜100 の整数
         - 異なる立場を必ず含める：
         - 強い賛成（+60〜+90）を最低1件
         - 強い反対（-60〜-30）を最低1件
-        - 中立（-10〜+10）を最低1件
+        - 中立（-20〜+20）を最低1件
 
         # 多様性（できる限り守る）
         - 可能な限り異なる媒体（ドメイン）から集める（最低 {min_sources} 媒体を目標）
         - 同一URLから作る item は最大 {max_per_url} 件まで
-        - 8件それぞれ「論点」が被らないようにする（下の論点リストからできるだけ違うものを選ぶ）
+        - それぞれ「論点」が被らないようにする（可能なら違う観点を選ぶ）
 
-        # 論点リスト（例）
-        - 人身・農作物被害／住民安全
-        - 生態系・保護・共存
-        - 猟友会・担い手不足・費用
-        - 法制度・捕獲基準・運用の課題
-        - 市街地対策（電気柵、監視カメラ、警報、餌資源管理）
-        - 気候変動・餌不足・出没要因分析
-
-        # 重要：スコアの対応
-        - “積極的に駆除すべき” を支持するほどプラス
-        - “駆除拡大を抑制/共存/保護を優先” はマイナス
+        {viewpoints_block}
+        {force_block}
         """.strip()
+
 
 
 def collect_topic_cards(topic: str, max_items: int = 8, theme_statement: Optional[str] = None, min_sources: int = 4, max_per_url: int = 2) -> CollectedItems:
