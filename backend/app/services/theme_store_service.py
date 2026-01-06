@@ -25,7 +25,7 @@ def list_themes_with_opinions() -> Dict[str, Any]:
     opinions_res = sb.table("opinions").select("id,theme_id,title,body,score,color,source_url").execute()
     opinions = opinions_res.data or []
 
-    by_theme = Dict[str, List[dict]] = {}
+    by_theme: Dict[str, List[dict]] = {}
     for op in opinions:
         by_theme.setdefault(op["theme_id"], []).append({
             "id": op["id"],
@@ -33,7 +33,7 @@ def list_themes_with_opinions() -> Dict[str, Any]:
             "body": op["body"],
             "score": op["score"],
             "color": op["color"],
-            "source_url": op["source_url"]
+            "sourceUrl": op["source_url"]
         })
 
     out = []
@@ -58,7 +58,7 @@ def upsert_theme_and_opinions(theme: dict, opinions: list[dict]) -> None:
     """
     :param theme: {id,title,color}
     :type theme: dict
-    :param opinions: list of {id, theme_id, title, body, score, color, source_url}
+    :param opinions: list of {id, theme_id, title, body, score, color, sourceUrl}
     :type opinions: list[dict]
     """
 
@@ -70,4 +70,47 @@ def upsert_theme_and_opinions(theme: dict, opinions: list[dict]) -> None:
     sb.table("themes").upsert(theme).execute()
 
     if opinions:
-        sb.table("opinions").upsert(opinions).execute()
+        db_ops = []
+        for op in opinions:
+            op2 = dict(op)
+            if "sourceUrl" in op2:
+                op2["source_url"] = op2.pop("sourceUrl")
+            db_ops.append(op2)
+
+        sb.table("opinions").upsert(db_ops).execute()
+
+# DELETE AFTER TESTING
+def insert_opinions_only(opinion_rows):
+    if not enabled():
+        raise RuntimeError("Supabase not enabled.")
+    sb = client()
+    if opinion_rows:
+        db_ops = []
+        for op in opinion_rows:
+            op2 = dict(op)
+            if "sourceUrl" in op2:
+                op2["source_url"] = op2.pop("sourceUrl")
+            db_ops.append(op2)
+
+        res = sb.table("opinions").insert(db_ops).execute()
+        if getattr(res, "error", None):
+            raise RuntimeError(f"opinions insert failed: {res.error}")
+        
+def delete_opinions_for_theme(theme_id: str) -> int:
+    """
+    Delete all opinions for a given theme_id.
+    Returns the number of deleted rows (best-effort; depends on client response).
+    """
+    if not enabled():
+        raise RuntimeError("Supabase not enabled. Set SUPABASE_URL and SUPABASE_KEY.")
+
+    sb = client()
+    res = sb.table("opinions").delete().eq("theme_id", theme_id).execute()
+
+    err = getattr(res, "error", None)
+    if err:
+        raise RuntimeError(f"opinions delete failed: {err}")
+
+    # Some supabase-py versions return deleted rows in res.data; some return [].
+    data = getattr(res, "data", None) or []
+    return len(data)

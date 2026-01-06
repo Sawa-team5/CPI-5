@@ -18,7 +18,7 @@ const Frontend = ({ onLoginClick }) => {
       setNickname(storedNickname);
     }
 
-    fetch("/api/themes")
+    fetch("/api/themes/")
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
