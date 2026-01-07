@@ -3,12 +3,37 @@
 # テーマと意見の取得、立場スコアの更新を担当
 # ============================================
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import List, Optional
 from app.services.news_service import news_service
 
 router = APIRouter()
+
+
+# ============================================
+# 依存関数
+# ============================================
+
+async def get_current_user_id(x_user_id: Optional[str] = Header(None)) -> str:
+    """
+    リクエストヘッダーからユーザーIDを取得
+    
+    Args:
+        x_user_id: X-User-IDヘッダーの値
+        
+    Returns:
+        ユーザーID
+        
+    Raises:
+        HTTPException: ユーザーIDが提供されていない場合
+    """
+    if not x_user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="認証が必要です。X-User-IDヘッダーを提供してください。"
+        )
+    return x_user_id
 
 
 # ============================================
@@ -73,7 +98,7 @@ class VoteRequest(BaseModel):
 
 
 @router.post("/vote")
-async def vote(request: VoteRequest):
+async def vote(request: VoteRequest, user_id: str = Header(alias="X-User-ID")):
     """
     意見に対して投票（賛成/反対）してスコアを更新
     
@@ -83,17 +108,20 @@ async def vote(request: VoteRequest):
             - currentScore: 現在のユーザースコア (-100 ~ 100)
             - opinionId: 意見のID
             - voteType: 'agree' または 'oppose'
+        user_id: ログイン中のユーザーID（X-User-IDヘッダーから取得）
     
     Returns:
         {
           "newScore": 新しいスコア値
         }
     """
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="認証が必要です。ログインしてください。"
+        )
+    
     try:
-        # TODO: ユーザーIDの取得（認証実装後）
-        # 現在は仮のユーザーIDを使用
-        user_id = "test-user-id"  # 認証実装後に置き換える
-        
         result = await news_service.update_stance_score(
             user_id,
             request.opinionId,
