@@ -7,7 +7,7 @@ module.exports = function (app) {
       target: "http://localhost:8000",
       changeOrigin: true,
       logLevel: "debug",
-      pathRewrite: (path) => "/api" + path,
+      // pathRewrite: (path) => "/api" + path,
     })
   );
 
