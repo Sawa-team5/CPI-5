@@ -15,22 +15,37 @@ const ChatMode = ({ isOpen, onClose }) => {
 
   // WebSocket接続を作成し、chat_triggerイベントを監視する
   useEffect(() => {
-    /*
-    const ws = new WebSocket('ws://localhost:8000/ws'); // バックエンドのWebSocket URLに合わせてください
+    if (!userId) return
+
+    const ws = new WebSocket("ws://localhost:8000/ws");
 
     ws.onopen = () => {
-      console.log('WebSocket connected');
-    };
+      console.log("WebSocket connected");
+
+    ws.send(
+      JSON.stringify({
+        type: "hello",
+        userId: userId,
+      })
+    );
+    }
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'chat_trigger') {
-          // トリガー受信時の処理例：メッセージ追加
-          setMessages(prev => [...prev, { text: 'バックエンドからのトリガーを受信しました。', sender: 'bot' }]);
+
+        if (data.type === "chat_trigger") {
+        console.log("Chat trigger received", data);
+
+        // チャットモードを開く
+        setChatModeOpen(true);
+
+        // どのテーマで発火したか保持
+        setTriggeredThemeId(data.themeId);
+        setTriggeredScore(data.stanceScore);
         }
       } catch (e) {
-        console.error('Invalid JSON', e);
+        console.error("Invalid JSON", e);
       }
     };
 
@@ -45,8 +60,7 @@ const ChatMode = ({ isOpen, onClose }) => {
     return () => {
       ws.close();
     };
-    */
-  }, []);
+  }, [userId]);
 
   const handleSend = () => {
     const text = inputText.trim();
