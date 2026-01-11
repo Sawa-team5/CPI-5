@@ -75,7 +75,6 @@ const ChatMode = ({ isOpen, onClose }) => {
         setMessages(prev => [...prev, { text: 'AIの応答(ダミー): ' + text, sender: 'bot' }]);
     }, 500);
 
-    /*
     // PythonバックエンドにPOSTで送信し、応答を受け取る
     fetch('/chat', {
       method: 'POST',
@@ -90,7 +89,6 @@ const ChatMode = ({ isOpen, onClose }) => {
         setMessages(prev => [...prev, { text: 'エラーが発生しました。', sender: 'bot' }]);
         console.error(err);
       });
-    */
   };
 
   const handleKeyDown = (e) => {
