@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-const ChatMode = ({ isOpen, onClose }) => {
+const ChatMode = ({ isOpen, onClose, themeId, stanceScore }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [sessionId, setSessionId] = useState(null);
+  const [isSending, setIsSending] = useState(false);
+  const [isComposing, setIsComposing] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -13,90 +16,89 @@ const ChatMode = ({ isOpen, onClose }) => {
     scrollToBottom();
   }, [messages]);
 
-  // WebSocket接続を作成し、chat_triggerイベントを監視する
+  // Chat panel opened → initialize session + get step1 message once
   useEffect(() => {
-    if (!userId) return
+    if (!isOpen) return;
 
-    const ws = new WebSocket("ws://localhost:8000/ws");
+    // make a stable session id per theme trigger
+    const sid = themeId ? `theme-${themeId}` : `session-${Date.now()}`;
+    setSessionId(sid);
 
-    ws.onopen = () => {
-      console.log("WebSocket connected");
+    // reset messages when opening (optional)
+    setMessages([]);
 
-    ws.send(
-      JSON.stringify({
-        type: "hello",
-        userId: userId,
-      })
-    );
-    }
-
-    ws.onmessage = (event) => {
+    // kick off the first assistant message (step1)
+    (async () => {
       try {
-        const data = JSON.parse(event.data);
+        setIsSending(true);
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: sid,
+            message: '',
+            themeTitle: null,
+            stanceScore: stanceScore ?? null,
+            agreedOpinion: null,
+          }),
+        });
 
-        if (data.type === "chat_trigger") {
-        console.log("Chat trigger received", data);
+        const data = await res.json();
+        if (!res.ok || !data?.reply) throw new Error(data?.detail || 'Chat start failed');
 
-        // チャットモードを開く
-        setChatModeOpen(true);
-
-        // どのテーマで発火したか保持
-        setTriggeredThemeId(data.themeId);
-        setTriggeredScore(data.stanceScore);
-        }
-      } catch (e) {
-        console.error("Invalid JSON", e);
+        setMessages([{ text: data.reply, sender: 'bot' }]);
+      } catch (err) {
+        console.error(err);
+        setMessages([{ text: 'チャットの開始に失敗しました。', sender: 'bot' }]);
+      } finally {
+        setIsSending(false);
       }
-    };
+    })();
+  }, [isOpen, themeId, stanceScore]);
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error', error);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, [userId]);
-
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = inputText.trim();
-    if (!text) return;
+    if (!text || !sessionId || isSending) return;
 
     // ユーザーメッセージを追加
     setMessages(prev => [...prev, { text, sender: 'user' }]);
     setInputText('');
 
-    // ダミー応答 (バックエンド未接続のため)
-    setTimeout(() => {
-        setMessages(prev => [...prev, { text: 'AIの応答(ダミー): ' + text, sender: 'bot' }]);
-    }, 500);
+    try {
+      setIsSending(true);
 
-    // PythonバックエンドにPOSTで送信し、応答を受け取る
-    fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text })
-    })
-      .then(res => res.json())
-      .then(data => {
-        setMessages(prev => [...prev, { text: 'AIの応答: ' + data.reply, sender: 'bot' }]);
-      })
-      .catch(err => {
-        setMessages(prev => [...prev, { text: 'エラーが発生しました。', sender: 'bot' }]);
-        console.error(err);
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId,
+          message: text,
+          stanceScore: stanceScore ?? null,
+          // you can pass themeTitle/agreedOpinion later when you have them
+        }),
       });
+      
+      const data = await res.json();
+      if (!res.ok || !data?.reply) throw new Error(data?.detail || 'Chat failed');
+
+      setMessages(prev => [...prev, { text: data.reply, sender: 'bot' }]);
+    } catch (err) {
+      console.error(err);
+      setMessages(prev => [...prev, { text: 'エラーが発生しました。', sender: 'bot' }]);
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+  // If IME is composing, Enter should confirm conversion, not send
+  if (e.nativeEvent.isComposing || isComposing) return;
+
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    handleSend();
+  }
+};
 
   if (!isOpen) return null;
 
@@ -129,9 +131,9 @@ const ChatMode = ({ isOpen, onClose }) => {
       
       <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column' }}>
         {messages.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>
-                AIチャットへようこそ。<br/>何か話しかけてください。
-            </div>
+          <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>
+            {isSending ? 'AIが考えています…' : 'AIチャットへようこそ。'}
+          </div>
         )}
         {messages.map((msg, idx) => (
           <div
@@ -161,6 +163,8 @@ const ChatMode = ({ isOpen, onClose }) => {
             placeholder="メッセージを入力..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
+            onCompositionStart={() => setIsComposing(true)}
+            onCompositionEnd={() => setIsComposing(false)}
             onKeyDown={handleKeyDown}
             style={{ 
                 flexGrow: 1, 

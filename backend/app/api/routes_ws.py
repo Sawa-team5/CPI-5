@@ -4,7 +4,7 @@ from app.utils.logger import logger
 
 router = APIRouter()
 
-@router.websocket("/ws")
+@router.websocket("/")
 async def ws_endpoint(ws: WebSocket):
     """
     1通目に必ず hello を送る:

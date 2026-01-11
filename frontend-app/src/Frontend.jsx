@@ -10,6 +10,12 @@ const Frontend = ({ onLoginClick }) => {
   const [themes, setThemes] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [nickname, setNickname] = useState('');
+  const [triggeredThemeId, setTriggeredThemeId] = useState(null);
+  const [triggeredScore, setTriggeredScore] = useState(null);
+  const userId = localStorage.getItem('userId');
+  const isChatOpenRef = React.useRef(isChatOpen);
+
+  useEffect(() => { isChatOpenRef.current = isChatOpen; }, [isChatOpen]);
 
   useEffect(() => {
     // コンポーネント読み込み時にlocalStorageから名前を取得
@@ -42,6 +48,49 @@ const Frontend = ({ onLoginClick }) => {
       // 必要に応じて初期画面に戻るなどの処理をここに追加できます
     }
   };
+
+  // WebSocket: stance score が偏ったら backend から chat_trigger が飛んでくる
+  useEffect(() => {
+    if (!userId) return; // ログインしていないなら接続しない
+
+    const ws = new WebSocket('ws://localhost:8000/ws');
+
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      ws.send(JSON.stringify({ type: 'hello', userId }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'chat_trigger') {
+          if (isChatOpenRef.current) return;
+          console.log('chat_trigger received', data);
+
+          setTriggeredThemeId(data.themeId);
+          setTriggeredScore(data.stanceScore);
+
+          // ChatMode を開く
+          setIsChatOpen(true);
+        }
+      } catch (e) {
+        console.error('Invalid JSON', e);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error', error);
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [userId]);
+
 
   const handleThemeClick = (theme) => {
     setCurrentTheme(theme);
@@ -138,7 +187,12 @@ const Frontend = ({ onLoginClick }) => {
       {!isChatOpen && (
         <div style={styles.chatToggle} onClick={() => setIsChatOpen(true)}>◀</div>
       )}
-      <ChatMode isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      <ChatMode
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        themeId={triggeredThemeId}
+        stanceScore={triggeredScore}
+      />
     </div>
   );
 };
