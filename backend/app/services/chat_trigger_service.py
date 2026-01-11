@@ -2,7 +2,7 @@ from typing import Dict, Tuple, Optional
 from app.services.ws_manager import ws_manager
 from app.utils.logger import logger
 
-THRESHOLD = 40
+THRESHOLD = 10
 
 class ChatTriggerService:
     def __init__(self) -> None:

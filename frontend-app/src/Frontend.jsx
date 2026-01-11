@@ -12,8 +12,11 @@ const Frontend = ({ onLoginClick }) => {
   const [nickname, setNickname] = useState('');
   const [triggeredThemeId, setTriggeredThemeId] = useState(null);
   const [triggeredScore, setTriggeredScore] = useState(null);
+  
   const userId = localStorage.getItem('userId');
   const isChatOpenRef = React.useRef(isChatOpen);
+  const wsRef = React.useRef(null);
+  const wsStatusRef = React.useRef("idle");
 
   useEffect(() => { isChatOpenRef.current = isChatOpen; }, [isChatOpen]);
 
@@ -53,7 +56,14 @@ const Frontend = ({ onLoginClick }) => {
   useEffect(() => {
     if (!userId) return; // ログインしていないなら接続しない
 
-    const ws = new WebSocket('ws://localhost:8000/ws');
+    const existing = wsRef.current;
+    if (existing && (existing.readyState === WebSocket.OPEN || existing.readyState === WebSocket.CONNECTING)) {
+      return;
+    }
+
+    wsStatusRef.current = "connecting";
+    const ws = new WebSocket("ws://localhost:8000/api/ws");
+    wsRef.current = ws;
 
     ws.onopen = () => {
       console.log('WebSocket connected');
@@ -78,16 +88,24 @@ const Frontend = ({ onLoginClick }) => {
       }
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error', error);
+    ws.onerror = (e) => {
+      console.error("WebSocket error (readyState):", ws.readyState, e);
     };
 
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
+    ws.onclose = (ev) => {
+      wsStatusRef.current = "idle";
+      console.log('WebSocket disconnected', ev.code, ev.reason);
+
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+      }
     };
 
     return () => {
-      ws.close();
+      if (wsRef.current === ws) {
+        wsRef.current = null;
+        try { ws.close(); } catch {}
+      }
     };
   }, [userId]);
 

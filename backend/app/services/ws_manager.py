@@ -12,8 +12,7 @@ class WSManager:
     def __init__(self) -> None:
         self._connections: Dict[str, Dict[str, WebSocket]] = {} # user_id -> conn_id -> ws
 
-    async def connect(self, user_id: str, ws: WebSocket) -> str:
-        await ws.accept()
+    async def register(self, user_id: str, ws: WebSocket) -> str:
         conn_id = str(uuid.uuid4())
         self._connections.setdefault(user_id, {})
         self._connections[user_id][conn_id] = ws
