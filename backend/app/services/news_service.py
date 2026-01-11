@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Optional
 from app.core.supabase_client import get_supabase
 from app.utils.logger import logger
 
+from app.services.chat_trigger_service import chat_trigger_service
 
 class NewsService:
     """テーマと意見関連のビジネスロジックを提供するサービスクラス"""
@@ -203,6 +204,13 @@ class NewsService:
             }).execute()
             
             logger.info(f"立場スコア更新: user={user_id}, theme={theme_id}, opinion={opinion_id}, score={new_score}")
+
+            # Trigger chat mode
+            await chat_trigger_service.maybe_trigger(
+                user_id=user_id,
+                theme_id=theme_id,
+                new_score=new_score,
+            )
             
             # レスポンスにnewScoreを含める（フロントエンドの期待に合わせる）
             response = result.data[0] if result.data else {}
