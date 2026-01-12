@@ -2,11 +2,13 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Send, X, Bot, User, Loader2 } from 'lucide-react'; // アイコンライブラリ
 import remarkGfm from 'remark-gfm';
+import { sendSidebarChat } from './api_client';
 
 // スタイル定義（CSSファイルに分けてもOKですが、コピペ用にここに書きます）
 const styles = {
   container: {
-    width: '380px', // 少し幅を広げる
+    width: '480px',
+    maxWidth: '100vw',
     height: '100%',
     position: 'fixed',
     right: 0,
@@ -55,10 +57,10 @@ const styles = {
   }
 };
 
-const ChatMode = ({ isOpen, onClose }) => {
+const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // 思考中フラグ
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -72,47 +74,38 @@ const ChatMode = ({ isOpen, onClose }) => {
 // ChatMode.js の handleSend 関数
 
 const handleSend = async () => {
-  const text = inputText.trim();
-  if (!text || isLoading) return;
+    const text = inputText.trim();
+    if (!text || isLoading) return;
 
-  // 1. まず自分のメッセージを追加して画面更新
-  const newMessages = [...messages, { text, sender: 'user' }];
-  setMessages(newMessages);
-  setInputText('');
-  setIsLoading(true);
+    // UI更新
+    setMessages(prev => [...prev, { text, sender: 'user' }]);
+    setInputText('');
+    setIsLoading(true);
 
-  try {
-    // 2. Pythonへ送信（履歴すべてを送る）
-    const response = await fetch('http://localhost:8000/simple-chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ 
-        message: text,
-        history: messages, // ★ここが重要：これまでの履歴を送る
-        // 必要ならテーマを固定で送ることも可能
-        // topic: "AIの権利について", 
-        // viewpoint: "賛成" 
-      }),
-    });
+    try {
+      // 2. 直接 fetch していた部分を、関数呼び出しに変更
+      /* const response = await fetch('http://localhost:8000/simple-chat', { ... });
+      const data = await response.json(); 
+      */
+     
+      // ↓ こう書き換えるだけでスッキリ！
+      const data = await sendSidebarChat(
+        text, 
+        messages, 
+        currentTheme?.title || "自由テーマ",
+        currentOpinion?.title || "未定",
+        currentOpinion?.body || "特になし"
+      );
 
-    if (!response.ok) {
-      throw new Error('Network response was not ok');
+      setMessages(prev => [...prev, { text: data.reply, sender: 'bot' }]);
+
+    } catch (error) {
+      console.error('Error:', error);
+      setMessages(prev => [...prev, { text: 'エラーが発生しました。', sender: 'bot' }]);
+    } finally {
+      setIsLoading(false);
     }
-
-    const data = await response.json();
-
-    // 3. AIの返答を追加
-    setMessages(prev => [...prev, { text: data.reply, sender: 'bot' }]);
-
-  } catch (error) {
-    console.error('Error:', error);
-    setMessages(prev => [...prev, { text: 'エラーが発生しました。', sender: 'bot' }]);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { // Shift+Enterで改行できるように
@@ -138,12 +131,16 @@ const handleSend = async () => {
         </button>
       </div>
       
-      {/* メッセージエリア */}
       <div style={styles.messagesArea}>
+        {/* 3. 初期メッセージの変更 */}
         {messages.length === 0 && (
           <div style={{ textAlign: 'center', color: '#999', marginTop: '40px', fontSize: '14px' }}>
             <Bot size={48} style={{ margin: '0 auto 10px', opacity: 0.2 }} />
-            <p>何でも聞いてください。<br/>AIがお手伝いします。</p>
+            <p>
+              {currentTheme ? `「${currentTheme.title}」についてですね。` : 'こんにちは！'}
+              <br/>
+              気になったテーマや意見はありましたか？
+            </p>
           </div>
         )}
 

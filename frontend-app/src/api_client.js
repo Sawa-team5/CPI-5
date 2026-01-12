@@ -49,3 +49,25 @@ export const analyzePosition = async (topic, history) => {
   });
   return await res.json();
 };
+
+// 5. サイドバー用AIチャット (今回追加する機能)
+// ※ main.py で @app.post("/simple-chat") と定義したので、/api は含めないURLにします
+export const sendSidebarChat = async (message, history, topic, viewpoint, content) => {
+  // ベースURLの http://localhost:8000/api から /api を取り除いてルートにする
+  const rootUrl = API_BASE_URL.replace('/api', ''); 
+  
+  const res = await fetch(`${rootUrl}/simple-chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ 
+      message, 
+      history, 
+      topic, 
+      viewpoint, 
+      content 
+    }),
+  });
+  
+  if (!res.ok) throw new Error("チャット送信エラー");
+  return await res.json();
+};

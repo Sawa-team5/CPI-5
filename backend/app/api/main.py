@@ -5,7 +5,7 @@ import random
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 import google.generativeai as genai
 
 from app.ai_logic import generate_opinions, generate_chat_reply, analyze_position
@@ -198,46 +198,43 @@ def get_chat_instruction(topic, viewpoint, content, turn_count):
            - 共感して会話を続け（提案型で）、`[[END]]`は出さないでください。
         """
 
-# ... (既存のコード) ...
-
-# ★変更: リクエスト型を拡張（履歴を受け取れるようにする）
+# 1. リクエスト型に content (意見の本文) を追加
 class SimpleChatRequest(BaseModel):
     message: str
-    history: List[dict] = [] # [{role: 'user', text: '...'}, ...] の形式
-    # テスト用に任意のテーマを指定できるようにしてもOK
+    history: List[dict] = []
     topic: Optional[str] = "自由テーマ"
-    viewpoint: Optional[str] = "未定"
+    viewpoint: Optional[str] = "未定" # 賛成・反対など
+    content: Optional[str] = "特になし" # ★追加: 見ている意見の本文
 
+# 2. エンドポイントの修正
 @app.post("/simple-chat")
 async def simple_chat_endpoint(req: SimpleChatRequest):
     try:
-        # 1. ターン数の計算 (履歴の数 ÷ 2 + 1)
-        # 履歴が空なら1ターン目、2個(user+ai)あれば2ターン目...
+        # ターン数の計算
         current_turn = (len(req.history) // 2) + 1
         
-        # 2. そのターン専用のシステムプロンプトを生成
+        # ★修正: リクエストから受け取ったテーマ情報を渡す
+        # ユーザーがまだ何も発言していない(turn=1)等の場合でも、
+        # 「見ている意見(req.content)」を文脈としてセットします。
         system_instruction = get_chat_instruction(
             topic=req.topic,
             viewpoint=req.viewpoint,
-            content=req.history[0]['text'] if req.history else "特になし", # 最初の発言を「意見」とみなす
+            content=req.content, 
             turn_count=current_turn
         )
 
-        # 3. Geminiモデルの準備 (毎回instructionをセットし直す)
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-2.5-flash",
             system_instruction=system_instruction
         )
         
-        # 4. 過去の履歴をGemini形式に変換
+        # 会話履歴の変換
         gemini_history = []
         for h in req.history:
-            role = "user" if h['sender'] == 'user' else "model" # React側でsender: 'user'/'bot'としている場合
+            role = "user" if h['sender'] == 'user' else "model"
             if h['sender'] == 'bot': role = "model"
             gemini_history.append({"role": role, "parts": [h['text']]})
             
-        # 5. コンテンツ生成 (チャットセッションではなく、履歴付きの単発生成を使う)
-        # これにより、システムプロンプトの切り替えが確実に反映されます
         chat = model.start_chat(history=gemini_history)
         response = chat.send_message(req.message)
         
@@ -246,4 +243,3 @@ async def simple_chat_endpoint(req: SimpleChatRequest):
     except Exception as e:
         print(f"Chat Error: {e}")
         return {"reply": "エラーが発生しました。"}
-    
