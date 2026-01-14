@@ -43,17 +43,18 @@ const Frontend = ({ onLoginClick }) => {
             .sort(() => 0.5 - Math.random())
             .slice(0, 3);
 
-          for (const topic of selectedTopics) {
+          const promises = selectedTopics.map(async (topic) => {
             try {
               const res = await createThemeByAI(topic);
               if (res.themes && res.themes[0]) {
-                const theme = res.themes[0];
-                setThemes((prev) => [...prev, theme]);
+                setThemes((prev) => [...prev, res.themes[0]]);
               }
             } catch (err) {
               console.error(`生成失敗: ${topic}`, err);
             }
-          }
+          });
+
+          await Promise.all(promises);
         }
       } catch (err) {
         console.error("初期化エラー:", err);
@@ -85,6 +86,7 @@ const Frontend = ({ onLoginClick }) => {
 
   const handleVote = async (type) => {
     if (!selectedOpinion) return;
+    // ここに投票APIへの送信処理を追加する場合は書く
     setSelectedOpinion(null);
   };
 
@@ -150,7 +152,23 @@ const Frontend = ({ onLoginClick }) => {
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
             <h3 style={{color: selectedOpinion.color || '#333'}}>{selectedOpinion.title}</h3>
+            
             <p style={{margin: '20px 0', lineHeight: '1.6'}}>{selectedOpinion.body}</p>
+            
+            {/* ★追加: 情報源へのリンク表示エリア */}
+            {selectedOpinion.sourceUrl && (
+              <div style={styles.sourceLinkArea}>
+                <a 
+                  href={selectedOpinion.sourceUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  style={styles.sourceAnchor}
+                >
+                  出典: {selectedOpinion.sourceName || "関連リンク"} 🔗
+                </a>
+              </div>
+            )}
+
             <div style={styles.buttonGroup}>
               <button style={styles.opposeButton} onClick={() => handleVote('oppose')}>反対</button>
               <button style={styles.agreeButton} onClick={() => handleVote('agree')}>賛成</button>
@@ -168,6 +186,7 @@ const Frontend = ({ onLoginClick }) => {
         isOpen={isChatOpen} 
         onClose={() => setIsChatOpen(false)} 
         currentTheme={currentTheme}
+        currentOpinion={selectedOpinion} 
       />
     </div>
   );
@@ -269,6 +288,11 @@ const styles = {
   axisLine: { flex: 1, height: '6px', backgroundColor: '#eee', position: 'relative', margin: '0 20px', borderRadius: '3px' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' },
   modal: { backgroundColor: 'white', padding: '50px', borderRadius: '15px', width: '600px', maxWidth: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' },
+  
+  // ★追加: リンク用のスタイル
+  sourceLinkArea: { margin: '10px 0 20px 0', textAlign: 'right' },
+  sourceAnchor: { fontSize: '0.9rem', color: '#007bff', textDecoration: 'none', borderBottom: '1px solid #007bff' },
+
   buttonGroup: { display: 'flex', justifyContent: 'center', gap: '20px', margin: '30px 0' },
   agreeButton: { padding: '15px 40px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '50px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' },
   opposeButton: { padding: '15px 40px', backgroundColor: '#E53935', color: 'white', border: 'none', borderRadius: '50px', cursor: 'pointer', fontSize: '1.1rem', fontWeight: 'bold' },

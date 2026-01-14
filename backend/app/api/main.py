@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import google.generativeai as genai
+import urllib.parse
+import itertools
 
 from app.ai_logic import generate_opinions, generate_chat_reply, analyze_position
 from app.services.theme_store_service import list_themes_with_opinions, upsert_theme_and_opinions
@@ -41,7 +43,16 @@ class AnalysisRequest(BaseModel):
 class SimpleChatRequest(BaseModel):
     message: str
 
-THEME_COLORS = ["#E57373", "#FFD54F", "#81C784"]
+THEME_COLORS = [
+    "#E57373", # Red
+    "#FFD54F", # Yellow
+    "#81C784", # Green
+    "#64B5F6", # Blue
+    "#9575CD", # Purple
+    "#F06292"  # Pink
+]
+
+color_cycle = itertools.cycle(THEME_COLORS)
 
 @app.get("/api/themes")
 async def api_get_themes():
@@ -62,9 +73,7 @@ async def api_generate_opinions(req: TopicRequest):
         raise HTTPException(status_code=500, detail="AI generation failed")
 
     theme_id = str(uuid.uuid4())
-    
-    # ★変更: 色をランダムではなく順番っぽく選ぶ（今回はランダム選択だが候補を絞った）
-    theme_color = random.choice(THEME_COLORS)
+    theme_color = next(color_cycle)
 
     theme_data = {
         "id": theme_id,
@@ -74,20 +83,26 @@ async def api_generate_opinions(req: TopicRequest):
 
     formatted_opinions = []
     
-    # ★変更: 意見の色分けロジック（賛成なら赤系、反対なら青系、中立はテーマ色）
     for item in ai_raw_data:
         viewpoint = item.get("viewpoint", "中立")
         content = item.get("content", "")
+        source_name = item.get("source_name", "関連ニュース")
         
-        # デフォルトはテーマの色
+        # 色決めロジック
         op_color = theme_color
-        
-        # 簡易的なキーワード判定で色を変える（フロントエンド班のダミーデータに寄せる）
         if "肯定" in viewpoint or "賛成" in viewpoint or "メリット" in viewpoint:
-            op_color = "#EF9A9A" # 薄い赤
+            op_color = "#EF9A9A"
         elif "否定" in viewpoint or "反対" in viewpoint or "デメリット" in viewpoint or "懸念" in viewpoint:
-            op_color = "#90CAF9" # 薄い青（ダミーデータの fiscal-discipline の色に近い）
+            op_color = "#90CAF9"
         
+        # 検索ワード: テーマ + 立場 + ソース名 (例: "移民受け入れ拡大 反対派 日本経済新聞")
+        # これでかなり精度の高い記事が出ます
+        search_query = f"{req.topic} {viewpoint} {source_name}"
+        encoded_query = urllib.parse.quote(search_query)
+        
+        # ★重要: 必ず https:// から始める
+        google_search_url = f"https://www.google.com/search?q={encoded_query}"
+
         formatted_opinions.append({
             "id": str(uuid.uuid4()),
             "theme_id": theme_id,
@@ -95,7 +110,8 @@ async def api_generate_opinions(req: TopicRequest):
             "body": content,
             "score": 0,
             "color": op_color,
-            "sourceUrl": ""
+            "sourceName": source_name,
+            "sourceUrl": google_search_url
         })
 
     try:
