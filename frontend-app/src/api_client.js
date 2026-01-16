@@ -1,8 +1,8 @@
 // src/api_client.js
 
 // PythonサーバーのURL (FastAPI)
-const BASE_URL = "https://humble-space-goldfish-qjjw9gv45qpc9jgr-8000.app.github.dev";
-const API_BASE_URL = `${BASE_URL}/api`;
+const BASE_URL = "https://stunning-couscous-wrp9wgx549wp2gqvj-8000.app.github.dev";
+export const API_BASE_URL = `${BASE_URL}/api`; // exportが無いとバグるので足しときました
 
 // 1. 全テーマを取得 (初期表示用)
 export const fetchThemes = async () => {
