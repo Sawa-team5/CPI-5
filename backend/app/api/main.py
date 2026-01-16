@@ -255,7 +255,7 @@ async def simple_chat_endpoint(req: SimpleChatRequest):
         )
 
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
+            model_name="gemini-2.5-flash-lite",
             system_instruction=system_instruction
         )
         
