@@ -1,135 +1,100 @@
-# backend/app/ai_logic.py
 import os
 import json
 import google.generativeai as genai
-from dotenv import load_dotenv
-from .prompts import get_chat_instruction, get_positioning_prompt
-# get_opinion_prompt はこのファイル内で直接定義するため import から除外、または未使用でもOK
+import re
 
-# .envの読み込み
-load_dotenv()
+# APIキーの取得（.envは main.py で読み込まれるのでここでは os.getenv でOK）
 API_KEY = os.getenv("GOOGLE_API_KEY")
-genai.configure(api_key=API_KEY)
+if API_KEY:
+    genai.configure(api_key=API_KEY)
 
-# Gemini 1.5 Flash (または 2.0 Flash) を指定
-MODEL_NAME = "models/gemini-2.5-flash" 
-# ※ もし 2.5-flash-lite が使える環境ならそのままでOKですが、
-# 一般的には 1.5-flash が安定しています。エラーが出る場合は書き換えてください。
+MODEL_NAME = "gemini-2.5-flash-lite"
 
-# --- 1. 意見生成 ---
+# --- 1. 意見生成 (スコア付き) ---
 def generate_opinions(topic: str):
     """
-    テーマに基づいた意見と、それっぽい情報源(source_name)を生成する
+    テーマに基づいた意見、情報源、そしてポジションスコアを生成する
     """
-    # response_mime_type="application/json" でJSON出力を強制
     model = genai.GenerativeModel(MODEL_NAME, generation_config={"response_mime_type": "application/json"})
     
-    # ★プロンプト定義: source_name を含めるように指示
+    # ★修正: position_score を追加したプロンプト
     prompt = f"""
     テーマ「{topic}」について、異なる立場の意見を5つ生成してください。
     
     【出力フォーマット】
     以下のJSON形式のリストのみを出力してください。
-    必ず「viewpoint（立場名）」「content（意見内容）」「source_name（情報源の名前）」の3つを含めてください。
-
+    
     [
       {{
         "viewpoint": "肯定派", 
         "content": "財源確保のために必要だ...",
-        "source_name": "日本経済新聞のコラム"
+        "source_name": "日本経済新聞のコラム",
+        "position_score": 80
       }},
       {{
         "viewpoint": "反対派", 
         "content": "生活が苦しくなる...",
-        "source_name": "X (旧Twitter) の投稿"
+        "source_name": "X (旧Twitter) の投稿",
+        "position_score": -70
       }}
     ]
     
-    【条件】
-    - source_name は「〇〇新聞」「XX省の統計」「Xでの話題」「〇〇大学の研究」など、その意見がいかにも出てきそうな媒体名を想像して書いてください。
+    【必須条件】
+    1. position_score は、その意見が「テーマに対してどれくらい賛成/反対か」を -100（完全反対）〜 100（完全賛成）の数値で決めてください。
+       - 0 は完全な中立です。
+       - 肯定的な意見はプラスの値（例: 30, 80, 100）
+       - 否定的な意見はマイナスの値（例: -30, -80, -100）
+    2. source_name は、その意見がいかにも出てきそうな架空の、しかしもっともらしい媒体名を書いてください。
     """
     
     try:
         response = model.generate_content(prompt)
-        return json.loads(response.text)
+        text = response.text
+        
+        # Markdownの ```json ... ``` を除去する安全策
+        json_match = re.search(r'\[.*\]', text, re.DOTALL)
+        if json_match:
+            text = json_match.group(0)
+            
+        return json.loads(text)
     except Exception as e:
         print(f"Error in opinions: {e}")
-        return [] # エラー時は空リスト
+        return []
 
 # --- 2. チャット応答 ---
-def generate_chat_reply(topic: str, viewpoint: str, content: str, history: list):
+def generate_chat_reply(topic, opinion_title, opinion_body, history):
     """
-    history: [{"role": "user", "parts": ["..."]}, ...] の形式を想定
+    チャットの返答を生成する
+    history: [{"role": "user", "parts": ["..."]}, ...]
     """
-    model = genai.GenerativeModel(MODEL_NAME)
-    
-    # ターン数の計算（ユーザーの発言数 + 今回の入力分1）
-    user_turns = len([m for m in history if m["role"] == "user"])
-    current_turn = user_turns + 1
-    
-    # 最新のユーザー入力（今回の発言）を取得
-    if history and history[-1]["role"] == "user":
-        last_user_message = history[-1]["parts"][0]
-    else:
-        last_user_message = "" # 初回起動時など
+    if not API_KEY:
+        return {"reply": "APIキー設定エラー"}
 
-    # プロンプト作成 (prompts.py から取得)
-    system_instruction = get_chat_instruction(topic, viewpoint, content, current_turn)
+    system_instruction = f"""
+    あなたは「{topic}」というテーマにおける「{opinion_title}」という立場の人物として振る舞ってください。
     
-    # チャット履歴をAPI用の形式に変換
-    # Gemini APIのhistoryは {"role": "user"|"model", "parts": ["text"]} のリスト
-    gemini_history = []
+    あなたの意見の詳細:
+    {opinion_body}
     
-    # 今回の最新メッセージ以外の履歴を作成
-    past_history = history[:-1] if history else []
-    
-    for h in past_history:
-        role = "user" if h["role"] == "user" else "model"
-        gemini_history.append({"role": role, "parts": h["parts"]})
+    ユーザーはこの意見に対して興味を持ち、議論を求めています。
+    短く、対話的に、相手に問いかけるように返答してください。
+    """
 
+    model = genai.GenerativeModel(MODEL_NAME, system_instruction=system_instruction)
+    
     try:
-        # チャットセッション開始 (system_instructionを設定)
-        model = genai.GenerativeModel(MODEL_NAME, system_instruction=system_instruction)
-        chat = model.start_chat(history=gemini_history)
+        # 最後のメッセージ以外を履歴として渡す
+        chat = model.start_chat(history=history[:-1])
+        # 最後のメッセージを送信
+        last_msg = history[-1]["parts"][0]
+        response = chat.send_message(last_msg)
         
-        # メッセージ送信
-        response = chat.send_message(last_user_message)
-        ai_text = response.text
-        
-        # 終了判定 ([[END]]タグがあるか)
-        is_finished = False
-        if "[[END]]" in ai_text:
-            is_finished = True
-            ai_text = ai_text.replace("[[END]]", "").strip()
-            
-        return {
-            "reply": ai_text,
-            "phase": f"Turn {current_turn}", # デバッグ用にターン数を返す
-            "is_finished": is_finished
-        }
+        return {"reply": response.text}
     except Exception as e:
         print(f"Error in chat: {e}")
-        return {"reply": "申し訳ありません。エラーが発生しました。", "is_finished": False}
+        return {"reply": "すみません、うまく思考できませんでした。"}
 
-# --- 3. 座標分析 ---
+# --- 3. 座標分析 (今回は使わないかもですが残しておきます) ---
 def analyze_position(topic: str, history: list):
-    # 分析もJSONモードで行う
-    model = genai.GenerativeModel(MODEL_NAME, generation_config={"response_mime_type": "application/json"})
-    
-    # ログをテキスト化
-    history_text = ""
-    for entry in history:
-        role = "User" if entry["role"] == "user" else "AI"
-        content = entry["parts"][0]
-        history_text += f"{role}: {content}\n"
-
-    prompt = get_positioning_prompt(topic, history_text)
-    
-    try:
-        response = model.generate_content(prompt)
-        return json.loads(response.text)
-    except Exception as e:
-        print(f"Error in analysis: {e}")
-        # デフォルト値を返す
-        return {"x": 0, "y": 0, "tags": [], "summary": "分析失敗"}
-    
+    # 必要なら実装
+    pass

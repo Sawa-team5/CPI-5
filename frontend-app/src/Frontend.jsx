@@ -1,21 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import dummyData from './dummyData.json';
 import ChatMode from './ChatMode';
-import { fetchThemes, createThemeByAI } from './api_client';
+import { fetchThemes, createThemeByAI, API_BASE_URL } from './api_client';
 
 const Frontend = ({ onLoginClick }) => {
   const [currentTheme, setCurrentTheme] = useState(null);
-  const [selfScore, setSelfScore] = useState(0);
+  const [selfScore, setSelfScore] = useState(0); 
   const [selectedOpinion, setSelectedOpinion] = useState(null);
   const [themes, setThemes] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [nickname, setNickname] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // ★追加: 自動送信メッセージ用
+  // ★修正: メッセージをオブジェクト（テキスト＋ID）で管理
   const [startMessage, setStartMessage] = useState(null);
   
-  // 初期化制御用フラグ
   const initializedRef = useRef(false);
 
   useEffect(() => {
@@ -78,32 +77,73 @@ const Frontend = ({ onLoginClick }) => {
     }
   };
 
-  const handleThemeClick = (theme) => {
+  const handleThemeClick = async (theme) => {
     setCurrentTheme(theme);
-    setSelfScore(0);
+    
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/stance/${theme.id}`, {
+            headers: { 'X-User-ID': userId }
+        });
+        if (res.ok) {
+            const data = await res.json();
+            setSelfScore(data.stance_score || 0);
+        } else {
+            setSelfScore(0);
+        }
+      } catch (e) {
+        console.error("Failed to fetch stance", e);
+        setSelfScore(0);
+      }
+    } else {
+      setSelfScore(0);
+    }
   };
 
   const handleOpinionClick = (opinion) => {
     setSelectedOpinion(opinion);
   };
 
-  // ★修正: 投票と同時にチャットを開始する処理
-  const handleVote = (type) => {
+  const handleVote = async (type) => {
     if (!selectedOpinion) return;
 
-    // 1. 自動送信メッセージを作成
-    const msg = type === 'agree' 
+    const userId = localStorage.getItem('userId');
+    if (userId) {
+        try {
+            const res = await fetch(`${API_BASE_URL}/vote`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'X-User-ID': userId 
+                },
+                body: JSON.stringify({
+                    opinionId: selectedOpinion.id,
+                    voteType: type
+                })
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                setSelfScore(data.newScore);
+            }
+        } catch (e) {
+            console.error("Vote failed", e);
+        }
+    }
+
+    const msgText = type === 'agree' 
       ? `「${selectedOpinion.title}」という意見に賛成です。` 
       : `「${selectedOpinion.title}」という意見には反対です。懸念点があります。`;
     
-    setStartMessage(msg);
+    // ★修正: テキストだけでなく、現在時刻(id)もセットする
+    // これにより、同じボタンを連打しても毎回「新しい命令」として扱われる
+    setStartMessage({ text: msgText, id: Date.now() });
 
-    // 2. モーダルを閉じてチャットを開く
     setSelectedOpinion(null); 
     setIsChatOpen(true);
   };
 
-  // ★追加: チャットを閉じる処理
   const handleCloseChat = () => {
     setIsChatOpen(false);
     setStartMessage(null);
@@ -167,7 +207,6 @@ const Frontend = ({ onLoginClick }) => {
         )}
       </div>
 
-      {/* 意見詳細モーダル */}
       {selectedOpinion && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
@@ -175,7 +214,6 @@ const Frontend = ({ onLoginClick }) => {
             
             <p style={{margin: '20px 0', lineHeight: '1.6'}}>{selectedOpinion.body}</p>
             
-            {/* 情報源リンク */}
             {selectedOpinion.sourceUrl && (
               <div style={styles.sourceLinkArea}>
                 <a 
@@ -190,7 +228,6 @@ const Frontend = ({ onLoginClick }) => {
             )}
 
             <div style={styles.buttonGroup}>
-              {/* ★ここから handleVote を呼ぶように修正 */}
               <button style={styles.agreeButton} onClick={() => handleVote('agree')}>
                 👍 賛成して議論する
               </button>
@@ -207,27 +244,18 @@ const Frontend = ({ onLoginClick }) => {
         <div style={styles.chatToggle} onClick={() => setIsChatOpen(true)}>◀</div>
       )}
       
-      {/* チャットコンポーネント */}
       <ChatMode 
         isOpen={isChatOpen} 
         onClose={handleCloseChat} 
         currentTheme={currentTheme}
-        currentOpinion={selectedOpinion} // チャットを開く瞬間はnullになっているが、直前の操作は記録されている想定
-        initialMessage={startMessage}    // ★メッセージを渡す
+        currentOpinion={selectedOpinion} 
+        initialMessage={startMessage} 
       />
     </div>
   );
 };
 
 // --- サブコンポーネント ---
-
-const FIXED_POSITIONS_5 = [
-  { top: '15%', left: '15%' },
-  { top: '15%', left: '85%' },
-  { top: '50%', left: '50%' },
-  { top: '85%', left: '20%' },
-  { top: '85%', left: '80%' },
-];
 
 const ThemeListView = ({ themes, onThemeClick }) => (
   <div style={styles.bubbleContainer}>
@@ -248,15 +276,35 @@ const ThemeListView = ({ themes, onThemeClick }) => (
   </div>
 );
 
+const useBubblePositions = (opinions) => {
+    return useMemo(() => {
+        const positions = {};
+        const sortedOpinions = [...opinions].sort((a, b) => (a.score || 0) - (b.score || 0));
+        const Y_PATTERNS = [20, 60, 30, 70, 40]; 
+
+        sortedOpinions.forEach((op, index) => {
+            const score = op.score || 0;
+            const left = ((score + 100) / 200) * 90 + 5;
+            const top = Y_PATTERNS[index % Y_PATTERNS.length];
+            positions[op.id] = { left: `${left}%`, top: `${top}%` };
+        });
+
+        return positions;
+    }, [opinions]); 
+};
+
 const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => {
   const opinions = theme.opinions.slice(0, 5);
+  const bubblePositions = useBubblePositions(opinions);
+  const selfLeft = ((selfScore + 100) / 200) * 90 + 5;
 
   return (
     <div style={styles.detailContainer}>
       <h2 style={{...styles.pageTitle, borderColor: theme.color}}>{theme.title}</h2>
+      
       <div style={styles.bubblesArea}>
-        {opinions.map((op, index) => {
-          const pos = FIXED_POSITIONS_5[index % FIXED_POSITIONS_5.length];
+        {opinions.map((op) => {
+          const pos = bubblePositions[op.id] || { top: '50%', left: '50%' };
           return (
             <div
               key={op.id}
@@ -265,6 +313,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => {
                 left: pos.left,
                 top: pos.top,
                 backgroundColor: op.color || theme.color, 
+                transition: 'all 0.5s ease-out', 
               }}
               onClick={() => onOpinionClick(op)}
             >
@@ -276,8 +325,9 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => {
         <div
           style={{
             ...styles.selfBubble,
-            left: '50%',
-            top: '92%', 
+            left: `${selfLeft}%`,
+            top: '85%', 
+            transition: 'left 0.5s ease-out', 
           }}
         >
           自分
@@ -286,7 +336,9 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => {
 
       <div style={styles.axisContainer}>
         <div style={styles.axisLabelLeft}>反対</div>
-        <div style={{...styles.axisLine, backgroundColor: theme.color}}></div>
+        <div style={{...styles.axisLine, backgroundColor: '#ddd'}}>
+            <div style={{ position: 'absolute', left: '50%', top: '-5px', width: '2px', height: '16px', backgroundColor: '#aaa' }}></div>
+        </div>
         <div style={styles.axisLabelRight}>賛成</div>
       </div>
     </div>

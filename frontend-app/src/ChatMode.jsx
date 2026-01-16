@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Send, X, Bot, User, Loader2 } from 'lucide-react'; 
+import { Send, X, Bot, User, Loader2, RotateCcw, AlertTriangle } from 'lucide-react'; // AlertTriangleを追加
 import remarkGfm from 'remark-gfm';
 import { sendSidebarChat } from './api_client';
 
@@ -27,6 +27,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
+    position: 'relative', // モーダル配置のため
   },
   messagesArea: {
     flex: 1,
@@ -36,6 +37,7 @@ const styles = {
     flexDirection: 'column',
     gap: '16px',
     backgroundColor: '#f8f9fa',
+    position: 'relative', // モーダル配置のため
   },
   inputArea: {
     padding: '16px',
@@ -53,6 +55,37 @@ const styles = {
     alignItems: 'center',
     color: '#666',
     fontSize: '12px'
+  },
+  // ★追加: モーダル用のスタイル
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)', // 少し透けた白背景
+    backdropFilter: 'blur(2px)', // ぼかし効果
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+  },
+  confirmModal: {
+    backgroundColor: 'white',
+    padding: '24px',
+    borderRadius: '16px',
+    width: '80%',
+    maxWidth: '320px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+    border: '1px solid #eee',
+    textAlign: 'center',
+    animation: 'fadeIn 0.2s ease-out',
+  },
+  modalButtons: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '20px',
+    justifyContent: 'center',
   }
 };
 
@@ -60,10 +93,12 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessag
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef(null);
   
-  // 自動送信が2回走らないようにするためのフラグ
-  const hasSentInitialRef = useRef(false);
+  // ★追加: リセット確認モーダルの表示フラグ
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const messagesEndRef = useRef(null);
+  const lastProcessedIdRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -73,17 +108,13 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessag
     scrollToBottom();
   }, [messages, isLoading]);
 
-  // ★修正ポイント1: executeSend を useCallback で包む
-  // これにより、依存する値が変わらない限り関数が再作成されなくなります
   const executeSend = useCallback(async (textToSend) => {
     if (!textToSend || isLoading) return;
 
-    // UI更新
     setMessages(prev => [...prev, { text: textToSend, sender: 'user' }]);
     setIsLoading(true);
 
     try {
-      // api_client経由で送信
       const data = await sendSidebarChat(
         textToSend, 
         messages, 
@@ -100,27 +131,22 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessag
     } finally {
       setIsLoading(false);
     }
-  }, [currentTheme, currentOpinion, isLoading, messages]); // この関数が使う変数を依存配列に指定
+  }, [currentTheme, currentOpinion, isLoading, messages]);
 
-  // ★修正ポイント2: 依存配列に executeSend を追加して警告を解消
   useEffect(() => {
-    if (isOpen && initialMessage && !hasSentInitialRef.current) {
-      executeSend(initialMessage);
-      hasSentInitialRef.current = true; // 送信済みフラグを立てる
-    }
-    
-    // チャットが閉じられたらフラグをリセット
-    if (!isOpen) {
-      hasSentInitialRef.current = false;
+    if (isOpen && initialMessage) {
+        if (initialMessage.id !== lastProcessedIdRef.current) {
+            executeSend(initialMessage.text);
+            lastProcessedIdRef.current = initialMessage.id;
+        }
     }
   }, [isOpen, initialMessage, executeSend]);
 
-  // 手動で送信ボタンを押したときの処理
   const handleManualSend = () => {
     const text = inputText.trim();
     if (!text) return;
     
-    setInputText(''); // 入力欄をクリア
+    setInputText('');
     executeSend(text);
   };
 
@@ -131,10 +157,80 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessag
     }
   };
 
+  // ★修正: リセットボタンを押したとき
+  const handleResetClick = () => {
+    if (messages.length > 0) {
+      setShowResetConfirm(true); // モーダルを表示
+    }
+  };
+
+  // ★追加: 実際にリセットを実行
+  const executeReset = () => {
+    setMessages([]);
+    setInputText('');
+    setShowResetConfirm(false); // モーダルを閉じる
+  };
+
+  // ★追加: キャンセル
+  const cancelReset = () => {
+    setShowResetConfirm(false);
+  };
+
   if (!isOpen) return null;
 
   return (
     <div style={styles.container}>
+      {/* ★追加: 確認モーダル (全体に被せる) */}
+      {showResetConfirm && (
+        <div style={styles.overlay}>
+          <div style={styles.confirmModal}>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ backgroundColor: '#fee2e2', padding: '12px', borderRadius: '50%', color: '#ef4444' }}>
+                <AlertTriangle size={24} />
+              </div>
+            </div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 'bold', color: '#111' }}>会話をリセットしますか？</h3>
+            <p style={{ margin: 0, fontSize: '13px', color: '#666', lineHeight: '1.5' }}>
+              これまでの会話履歴がすべて消去されます。<br/>この操作は元に戻せません。
+            </p>
+            
+            <div style={styles.modalButtons}>
+              <button 
+                onClick={cancelReset}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: 'white',
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500'
+                }}
+              >
+                キャンセル
+              </button>
+              <button 
+                onClick={executeReset}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                }}
+              >
+                リセットする
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ヘッダー */}
       <div style={styles.header}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -143,13 +239,23 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessag
           </div>
           <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '600', color: '#333' }}>AI Assistant</h3>
         </div>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>
-          <X size={20} />
-        </button>
+        
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button 
+                onClick={handleResetClick} 
+                title="会話をリセット"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', padding: '4px' }}
+            >
+                <RotateCcw size={18} />
+            </button>
+
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>
+                <X size={20} />
+            </button>
+        </div>
       </div>
       
       <div style={styles.messagesArea}>
-        {/* 初期メッセージ（履歴がない場合のみ表示） */}
         {messages.length === 0 && !isLoading && (
           <div style={{ textAlign: 'center', color: '#999', marginTop: '40px', fontSize: '14px' }}>
             <Bot size={48} style={{ margin: '0 auto 10px', opacity: 0.2 }} />
@@ -219,7 +325,6 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessag
           );
         })}
 
-        {/* 思考中のインジケーター */}
         {isLoading && (
           <div style={{ display: 'flex', gap: '8px' }}>
              <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -234,7 +339,6 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessag
         <div ref={messagesEndRef} />
       </div>
       
-      {/* 入力エリア */}
       <div style={styles.inputArea}>
         <div style={{ 
           display: 'flex', 
@@ -289,6 +393,10 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessag
         }
         .animate-spin {
           animation: spin 1s linear infinite;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </div>

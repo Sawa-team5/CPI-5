@@ -72,6 +72,8 @@ async def api_get_themes():
 @app.post("/api/opinions")
 async def api_generate_opinions(req: TopicRequest):
     print(f"Generating opinions for: {req.topic}")
+    
+    # AIロジック呼び出し
     ai_raw_data = generate_opinions(req.topic)
     
     if not ai_raw_data:
@@ -79,7 +81,7 @@ async def api_generate_opinions(req: TopicRequest):
 
     theme_id = str(uuid.uuid4())
     theme_color = next(color_cycle)
-
+    
     theme_data = {
         "id": theme_id,
         "title": req.topic,
@@ -93,19 +95,21 @@ async def api_generate_opinions(req: TopicRequest):
         content = item.get("content", "")
         source_name = item.get("source_name", "関連ニュース")
         
-        # 色決めロジック
-        op_color = theme_color
-        if "肯定" in viewpoint or "賛成" in viewpoint or "メリット" in viewpoint:
-            op_color = "#EF9A9A"
-        elif "否定" in viewpoint or "反対" in viewpoint or "デメリット" in viewpoint or "懸念" in viewpoint:
-            op_color = "#90CAF9"
+        # ★追加: AIが決めたスコアを取得（なければ0）
+        position_score = item.get("position_score", 0)
         
-        # 検索ワード: テーマ + 立場 + ソース名 (例: "移民受け入れ拡大 反対派 日本経済新聞")
-        # これでかなり精度の高い記事が出ます
+        # 色分けロジック (スコアに基づいて決定)
+        # プラスなら赤系、マイナスなら青系
+        if position_score > 20:
+            op_color = "#FFCDD2" # 赤（賛成）
+        elif position_score < -20:
+            op_color = "#BBDEFB" # 青（反対）
+        else:
+            op_color = "#F5F5F5" # グレー（中立）
+        
+        # URL生成
         search_query = f"{req.topic} {viewpoint} {source_name}"
         encoded_query = urllib.parse.quote(search_query)
-        
-        # ★重要: 必ず https:// から始める
         google_search_url = f"https://www.google.com/search?q={encoded_query}"
 
         formatted_opinions.append({
@@ -113,12 +117,16 @@ async def api_generate_opinions(req: TopicRequest):
             "theme_id": theme_id,
             "title": viewpoint,
             "body": content,
-            "score": 0,
+            
+            # ★ここが変わりました！AIのスコアを入れる
+            "score": position_score, 
+            
             "color": op_color,
             "sourceName": source_name,
             "sourceUrl": google_search_url
         })
 
+    # DB保存
     try:
         upsert_theme_and_opinions(theme_data, formatted_opinions)
     except Exception as e:
