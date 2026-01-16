@@ -1,8 +1,9 @@
 // src/api_client.js
 
 // PythonサーバーのURL (FastAPI)
-const BASE_URL = "https://stunning-couscous-wrp9wgx549wp2gqvj-8000.app.github.dev";
-export const API_BASE_URL = `${BASE_URL}/api`; // exportが無いとバグるので足しときました
+// ★重要: Frontend.jsx で使うために export をつけます
+export const BASE_URL = "https://humble-space-goldfish-qjjw9gv45qpc9jgr-8000.app.github.dev";
+export const API_BASE_URL = `${BASE_URL}/api`;
 
 // 1. 全テーマを取得 (初期表示用)
 export const fetchThemes = async () => {
@@ -31,7 +32,7 @@ export const createThemeByAI = async (topic) => {
   }
 };
 
-// 3. チャット送信 (ChatModeで使う用)
+// 3. チャット送信 (ChatModeで使う用 - 旧実装)
 export const sendChatMessage = async (topic, viewpoint, content, history) => {
   const res = await fetch(`${API_BASE_URL}/chat`, {
     method: "POST",
@@ -52,12 +53,10 @@ export const analyzePosition = async (topic, history) => {
 };
 
 // 5. サイドバー用AIチャット (今回追加する機能)
-// ※ main.py で @app.post("/simple-chat") と定義したので、/api は含めないURLにします
+// main.py で @app.post("/simple-chat") と定義したので、/api は含めないURLにします
 export const sendSidebarChat = async (message, history, topic, viewpoint, content) => {
-  // ベースURLの http://localhost:8000/api から /api を取り除いてルートにする
-  const rootUrl = API_BASE_URL.replace('/api', ''); 
-  
-  const res = await fetch(`${rootUrl}/simple-chat`, {
+  // BASE_URL を直接使えば置換処理は不要です
+  const res = await fetch(`${BASE_URL}/simple-chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ 
@@ -73,17 +72,16 @@ export const sendSidebarChat = async (message, history, topic, viewpoint, conten
   return await res.json();
 };
 
-// src/api_client.js の一番下に追加
-
-// 4. ユーザー認証（ログイン/登録）
+// 6. ユーザー認証（ログイン/登録）
 export const authUser = async (type, nickname) => {
+  // バックエンドのURL構造に合わせて endpoint を調整
+  // main.py で @app.post("/api/users/register") としている場合はこちら
   const endpoint = type === 'register' ? '/users/register' : '/users/login';
   
-  // ★ここで API_BASE_URL (https://...app.github.dev/api) を使うので、URLがズレない！
   const res = await fetch(`${API_BASE_URL}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: nickname, nickname: nickname }) // 便宜上usernameにもnicknameを入れる
+    body: JSON.stringify({ username: nickname, nickname: nickname })
   });
 
   const data = await res.json();

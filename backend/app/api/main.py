@@ -2,13 +2,14 @@
 
 import uuid
 import random
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 import google.generativeai as genai
 import urllib.parse
 import itertools
+from app.services.news_service import news_service
 
 from app.ai_logic import generate_opinions, generate_chat_reply, analyze_position
 from app.services.theme_store_service import list_themes_with_opinions, upsert_theme_and_opinions
@@ -69,11 +70,12 @@ async def api_get_themes():
         print(f"Fetch error: {e}")
         return {"themes": []}
 
+# backend/app/api/main.py の api_generate_opinions 関数
+
 @app.post("/api/opinions")
 async def api_generate_opinions(req: TopicRequest):
     print(f"Generating opinions for: {req.topic}")
     
-    # AIロジック呼び出し
     ai_raw_data = generate_opinions(req.topic)
     
     if not ai_raw_data:
@@ -95,38 +97,38 @@ async def api_generate_opinions(req: TopicRequest):
         content = item.get("content", "")
         source_name = item.get("source_name", "関連ニュース")
         
-        # ★追加: AIが決めたスコアを取得（なければ0）
+        # AIが決めたスコア (-100 ~ 100)
         position_score = item.get("position_score", 0)
         
-        # 色分けロジック (スコアに基づいて決定)
-        # プラスなら赤系、マイナスなら青系
+        opinion_id = str(uuid.uuid4()) # IDをここで生成
+
+        # ★重要: ここでサービス層にスコアを登録する！
+        news_service.register_opinion(opinion_id, position_score)
+
+        # 色決めロジック
         if position_score > 20:
-            op_color = "#FFCDD2" # 赤（賛成）
+            op_color = "#FFCDD2" # 赤
         elif position_score < -20:
-            op_color = "#BBDEFB" # 青（反対）
+            op_color = "#BBDEFB" # 青
         else:
-            op_color = "#F5F5F5" # グレー（中立）
+            op_color = "#F5F5F5" # グレー
         
-        # URL生成
+        # Google検索URL
         search_query = f"{req.topic} {viewpoint} {source_name}"
         encoded_query = urllib.parse.quote(search_query)
         google_search_url = f"https://www.google.com/search?q={encoded_query}"
 
         formatted_opinions.append({
-            "id": str(uuid.uuid4()),
+            "id": opinion_id, # 生成したIDを使う
             "theme_id": theme_id,
             "title": viewpoint,
             "body": content,
-            
-            # ★ここが変わりました！AIのスコアを入れる
             "score": position_score, 
-            
             "color": op_color,
             "sourceName": source_name,
             "sourceUrl": google_search_url
         })
 
-    # DB保存
     try:
         upsert_theme_and_opinions(theme_data, formatted_opinions)
     except Exception as e:
@@ -297,3 +299,26 @@ def api_login_user(req: UserRegisterRequest):
         },
         "token": "mock-token"
     }
+
+class VoteRequest(BaseModel):
+    opinionId: str
+    voteType: str
+
+@app.post("/api/vote")
+async def api_vote(req: VoteRequest, x_user_id: str = Header(None, alias="X-User-ID")):
+    # ユーザーIDがない場合は仮のIDを使う（エラー回避）
+    user_id = x_user_id or "default_user"
+    
+    result = await news_service.update_stance_score(
+        user_id=user_id,
+        opinion_id=req.opinionId,
+        vote_type=req.voteType
+    )
+    return result
+
+@app.get("/api/stance/{theme_id}")
+async def api_get_stance(theme_id: str, x_user_id: str = Header(None, alias="X-User-ID")):
+    user_id = x_user_id or "default_user"
+    
+    result = await news_service.get_user_stance(user_id, theme_id)
+    return result

@@ -3,6 +3,17 @@ import dummyData from './dummyData.json';
 import ChatMode from './ChatMode';
 import { fetchThemes, createThemeByAI, API_BASE_URL } from './api_client';
 
+// ★追加: 画面サイズを監視するカスタムフック (コンポーネントの外に定義)
+const useWindowSize = () => {
+  const [size, setSize] = useState([window.innerWidth, window.innerHeight]);
+  useEffect(() => {
+    const handleResize = () => setSize([window.innerWidth, window.innerHeight]);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+  return size;
+};
+
 const Frontend = ({ onLoginClick }) => {
   const [currentTheme, setCurrentTheme] = useState(null);
   const [selfScore, setSelfScore] = useState(0); 
@@ -12,10 +23,14 @@ const Frontend = ({ onLoginClick }) => {
   const [nickname, setNickname] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // ★修正: メッセージをオブジェクト（テキスト＋ID）で管理
+  // メッセージをオブジェクト（テキスト＋ID）で管理
   const [startMessage, setStartMessage] = useState(null);
   
   const initializedRef = useRef(false);
+
+  // 画面サイズ取得
+  const [width] = useWindowSize();
+  const isMobile = width < 768; // スマホ判定
 
   useEffect(() => {
     const storedNickname = localStorage.getItem('nickname');
@@ -125,6 +140,7 @@ const Frontend = ({ onLoginClick }) => {
             
             if (res.ok) {
                 const data = await res.json();
+                console.log("移動しました！", data);
                 setSelfScore(data.newScore);
             }
         } catch (e) {
@@ -136,8 +152,7 @@ const Frontend = ({ onLoginClick }) => {
       ? `「${selectedOpinion.title}」という意見に賛成です。` 
       : `「${selectedOpinion.title}」という意見には反対です。懸念点があります。`;
     
-    // ★修正: テキストだけでなく、現在時刻(id)もセットする
-    // これにより、同じボタンを連打しても毎回「新しい命令」として扱われる
+    // 現在時刻(id)もセットして再送防止
     setStartMessage({ text: msgText, id: Date.now() });
 
     setSelectedOpinion(null); 
@@ -149,61 +164,99 @@ const Frontend = ({ onLoginClick }) => {
     setStartMessage(null);
   };
 
-  return (
-    <div style={styles.container}>
-      <div style={styles.sidebar}>
-        <h3 style={styles.sidebarTitle}>Polyphony</h3>
-        
-        <h4 style={{fontSize: '0.9rem', marginBottom: '10px', opacity: 0.8}}>テーマ一覧</h4>
+  // ★修正: スマホ対応の動的スタイル
+  const dynamicStyles = {
+    container: {
+      ...styles.container,
+      flexDirection: isMobile ? 'column' : 'row',
+    },
+    sidebar: {
+      ...styles.sidebar,
+      width: isMobile ? '100%' : '200px',
+      height: isMobile ? 'auto' : '100vh',
+      padding: isMobile ? '10px' : '20px',
+      flexDirection: isMobile ? 'row' : 'column',
+      alignItems: 'center',
+      gap: isMobile ? '10px' : '0',
+    },
+    themeList: {
+      ...styles.themeList,
+      display: isMobile ? 'none' : 'block', // スマホ時は一旦リスト非表示
+    },
+    main: {
+      ...styles.main,
+      height: isMobile ? 'calc(100vh - 60px)' : '100%',
+    }
+  };
 
-        {isGenerating && themes.length === 0 && (
-          <div style={{color: '#fff', padding: '10px', fontSize: '0.9rem'}}>
-            AIが思考中...<br/>話題を作っています (3件)
-          </div>
+  return (
+    <div style={dynamicStyles.container}>
+      <div style={dynamicStyles.sidebar}>
+        <h3 style={isMobile ? {fontSize: '1.2rem', margin: 0, fontWeight:'bold'} : styles.sidebarTitle}>Polyphony</h3>
+        
+        {/* PC表示時のみリストなどを表示 */}
+        {!isMobile && (
+          <>
+            <h4 style={{fontSize: '0.9rem', marginBottom: '10px', opacity: 0.8}}>テーマ一覧</h4>
+
+            {isGenerating && themes.length === 0 && (
+              <div style={{color: '#fff', padding: '10px', fontSize: '0.9rem'}}>
+                AIが思考中...<br/>話題を作っています (3件)
+              </div>
+            )}
+
+            <ul style={styles.themeList}>
+              {themes.map(theme => (
+                <li 
+                  key={theme.id} 
+                  style={{
+                    ...styles.themeItem,
+                    backgroundColor: currentTheme?.id === theme.id ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)',
+                    borderLeft: `5px solid ${theme.color || '#ccc'}`
+                  }}
+                  onClick={() => handleThemeClick(theme)}
+                >
+                  <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                    {theme.title}
+                  </span>
+                  <span style={styles.arrow}>▶</span>
+                </li>
+              ))}
+            </ul>
+            
+            <div style={styles.userInfoArea}>
+              {nickname ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <span>Login: <strong>{nickname}</strong></span>
+                  <span onClick={handleLogout} style={styles.logoutLink}>ログアウト</span>
+                </div>
+              ) : (
+                <span onClick={onLoginClick} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
+                  ログインしてください
+                </span>
+              )}
+            </div>
+          </>
         )}
 
-        <ul style={styles.themeList}>
-          {themes.map(theme => (
-            <li 
-              key={theme.id} 
-              style={{
-                ...styles.themeItem,
-                backgroundColor: currentTheme?.id === theme.id ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)',
-                borderLeft: `5px solid ${theme.color || '#ccc'}`
-              }}
-              onClick={() => handleThemeClick(theme)}
-            >
-              <span style={{overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                {theme.title}
-              </span>
-              <span style={styles.arrow}>▶</span>
-            </li>
-          ))}
-        </ul>
-        
-        <div style={styles.userInfoArea}>
-          {nickname ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <span>Login: <strong>{nickname}</strong></span>
-              <span onClick={handleLogout} style={styles.logoutLink}>ログアウト</span>
-            </div>
-          ) : (
-            <span onClick={onLoginClick} style={{ cursor: 'pointer', textDecoration: 'underline' }}>
-              ログインしてください
-            </span>
-          )}
-        </div>
+        {/* スマホ表示時の簡易ヘッダー */}
+        {isMobile && (
+           <div style={{marginLeft: 'auto', fontSize: '0.8rem'}}>
+              {nickname ? <span onClick={handleLogout}>LogOut</span> : <span onClick={onLoginClick}>Login</span>}
+           </div>
+        )}
       </div>
 
-      <div style={styles.main}>
+      <div style={dynamicStyles.main}>
         {currentTheme ? (
           <ThemeDetailView 
             theme={currentTheme} 
             selfScore={selfScore} 
             onOpinionClick={handleOpinionClick} 
+            isMobile={isMobile} // スマホ判定を渡す
           />
         ) : (
-          <ThemeListView themes={themes} onThemeClick={handleThemeClick} />
+          <ThemeListView themes={themes} onThemeClick={handleThemeClick} isMobile={isMobile} />
         )}
       </div>
 
@@ -257,7 +310,7 @@ const Frontend = ({ onLoginClick }) => {
 
 // --- サブコンポーネント ---
 
-const ThemeListView = ({ themes, onThemeClick }) => (
+const ThemeListView = ({ themes, onThemeClick, isMobile }) => (
   <div style={styles.bubbleContainer}>
     {themes.map((theme, index) => (
       <div
@@ -276,7 +329,8 @@ const ThemeListView = ({ themes, onThemeClick }) => (
   </div>
 );
 
-const useBubblePositions = (opinions) => {
+// バブル位置計算 (スマホ対応版)
+const useBubblePositions = (opinions, isMobile) => {
     return useMemo(() => {
         const positions = {};
         const sortedOpinions = [...opinions].sort((a, b) => (a.score || 0) - (b.score || 0));
@@ -284,19 +338,29 @@ const useBubblePositions = (opinions) => {
 
         sortedOpinions.forEach((op, index) => {
             const score = op.score || 0;
-            const left = ((score + 100) / 200) * 90 + 5;
+            
+            // スマホなら表示範囲を狭める (見切れ防止)
+            const range = isMobile ? 70 : 90;
+            const offset = isMobile ? 15 : 5;
+            
+            const left = ((score + 100) / 200) * range + offset;
             const top = Y_PATTERNS[index % Y_PATTERNS.length];
+            
             positions[op.id] = { left: `${left}%`, top: `${top}%` };
         });
 
         return positions;
-    }, [opinions]); 
+    }, [opinions, isMobile]); 
 };
 
-const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => {
+const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
   const opinions = theme.opinions.slice(0, 5);
-  const bubblePositions = useBubblePositions(opinions);
-  const selfLeft = ((selfScore + 100) / 200) * 90 + 5;
+  const bubblePositions = useBubblePositions(opinions, isMobile);
+  
+  // 自分バブルの位置計算
+  const range = isMobile ? 70 : 90;
+  const offset = isMobile ? 15 : 5;
+  const selfLeft = ((selfScore + 100) / 200) * range + offset;
 
   return (
     <div style={styles.detailContainer}>
@@ -313,7 +377,11 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => {
                 left: pos.left,
                 top: pos.top,
                 backgroundColor: op.color || theme.color, 
-                transition: 'all 0.5s ease-out', 
+                transition: 'all 0.5s ease-out',
+                // スマホならバブルを少し小さく
+                width: isMobile ? '110px' : '150px',
+                height: isMobile ? '110px' : '150px',
+                fontSize: isMobile ? '0.75rem' : '0.9rem',
               }}
               onClick={() => onOpinionClick(op)}
             >
@@ -322,6 +390,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => {
           );
         })}
         
+        {/* 自分バブル */}
         <div
           style={{
             ...styles.selfBubble,
@@ -330,16 +399,26 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => {
             transition: 'left 0.5s ease-out', 
           }}
         >
-          自分
+          <span style={{fontSize: '0.8rem', display: 'block'}}>自分</span>
+          <span style={{fontSize: '0.7rem'}}>{Math.round(selfScore)}</span>
         </div>
       </div>
 
       <div style={styles.axisContainer}>
-        <div style={styles.axisLabelLeft}>反対</div>
-        <div style={{...styles.axisLine, backgroundColor: '#ddd'}}>
-            <div style={{ position: 'absolute', left: '50%', top: '-5px', width: '2px', height: '16px', backgroundColor: '#aaa' }}></div>
+        <div style={styles.axisLabelLeft}>
+          <span style={{fontSize: '1.2rem', display: 'block'}}>反対</span>
+          <span style={{fontSize: '0.8rem', opacity: 0.6}}>-100</span>
         </div>
-        <div style={styles.axisLabelRight}>賛成</div>
+
+        <div style={{...styles.axisLine, backgroundColor: '#ddd'}}>
+            <div style={{ position: 'absolute', left: '50%', top: '-8px', width: '2px', height: '22px', backgroundColor: '#aaa' }}></div>
+            <div style={{ position: 'absolute', left: '50%', top: '15px', transform: 'translateX(-50%)', fontSize: '0.7rem', color: '#999' }}>0</div>
+        </div>
+
+        <div style={styles.axisLabelRight}>
+          <span style={{fontSize: '1.2rem', display: 'block'}}>賛成</span>
+          <span style={{fontSize: '0.8rem', opacity: 0.6}}>+100</span>
+        </div>
       </div>
     </div>
   );
@@ -348,7 +427,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick }) => {
 // --- Styles ---
 const styles = {
   container: { display: 'flex', height: '100vh', fontFamily: '"Helvetica Neue", Arial, sans-serif', backgroundColor: '#f9f9f9' },
-  sidebar: { width: '260px', backgroundColor: '#37474F', padding: '20px', color: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '2px 0 5px rgba(0,0,0,0.1)', zIndex: 10 },
+  sidebar: { width: '200px', backgroundColor: '#37474F', padding: '20px', color: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '2px 0 5px rgba(0,0,0,0.1)', zIndex: 10 },
   sidebarTitle: { marginBottom: '20px', fontSize: '1.5rem', fontWeight: 'bold', letterSpacing: '1px' },
   themeList: { listStyle: 'none', padding: 0, flex: 1, overflowY: 'auto' },
   themeItem: { padding: '12px 15px', backgroundColor: 'rgba(255,255,255,0.1)', marginBottom: '8px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '4px', fontSize: '0.95rem', transition: 'all 0.2s' },
@@ -363,9 +442,9 @@ const styles = {
   bubblesArea: { flex: 1, position: 'relative', marginBottom: '40px' },
   opinionBubble: { position: 'absolute', width: '150px', height: '150px', borderRadius: '50%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '15px', fontSize: '0.9rem', cursor: 'pointer', boxShadow: '0 5px 15px rgba(0,0,0,0.15)', transform: 'translate(-50%, -50%)', zIndex: 2, color: '#333', transition: 'transform 0.2s', fontWeight: 'bold' },
   selfBubble: { position: 'absolute', width: '80px', height: '80px', borderRadius: '50%', backgroundColor: 'white', border: '3px solid #333', color: '#333', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', transform: 'translate(-50%, -50%)', zIndex: 3, boxShadow: '0 2px 5px rgba(0,0,0,0.2)' },
-  axisContainer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px', width: '100%', padding: '0 40px' },
-  axisLabelLeft: { fontWeight: 'bold', fontSize: '1.2rem', color: '#555' },
-  axisLabelRight: { fontWeight: 'bold', fontSize: '1.2rem', color: '#555' },
+  axisContainer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '80px', width: '100%', padding: '0 20px' },
+  axisLabelLeft: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
+  axisLabelRight: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
   axisLine: { flex: 1, height: '6px', backgroundColor: '#eee', position: 'relative', margin: '0 20px', borderRadius: '3px' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' },
   modal: { backgroundColor: 'white', padding: '50px', borderRadius: '15px', width: '600px', maxWidth: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' },
