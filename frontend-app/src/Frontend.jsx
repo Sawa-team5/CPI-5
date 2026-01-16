@@ -12,6 +12,9 @@ const Frontend = ({ onLoginClick }) => {
   const [nickname, setNickname] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   
+  // ★追加: 自動送信メッセージ用
+  const [startMessage, setStartMessage] = useState(null);
+  
   // 初期化制御用フラグ
   const initializedRef = useRef(false);
 
@@ -84,10 +87,26 @@ const Frontend = ({ onLoginClick }) => {
     setSelectedOpinion(opinion);
   };
 
-  const handleVote = async (type) => {
+  // ★修正: 投票と同時にチャットを開始する処理
+  const handleVote = (type) => {
     if (!selectedOpinion) return;
-    // ここに投票APIへの送信処理を追加する場合は書く
-    setSelectedOpinion(null);
+
+    // 1. 自動送信メッセージを作成
+    const msg = type === 'agree' 
+      ? `「${selectedOpinion.title}」という意見に賛成です。` 
+      : `「${selectedOpinion.title}」という意見には反対です。懸念点があります。`;
+    
+    setStartMessage(msg);
+
+    // 2. モーダルを閉じてチャットを開く
+    setSelectedOpinion(null); 
+    setIsChatOpen(true);
+  };
+
+  // ★追加: チャットを閉じる処理
+  const handleCloseChat = () => {
+    setIsChatOpen(false);
+    setStartMessage(null);
   };
 
   return (
@@ -148,6 +167,7 @@ const Frontend = ({ onLoginClick }) => {
         )}
       </div>
 
+      {/* 意見詳細モーダル */}
       {selectedOpinion && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
@@ -155,7 +175,7 @@ const Frontend = ({ onLoginClick }) => {
             
             <p style={{margin: '20px 0', lineHeight: '1.6'}}>{selectedOpinion.body}</p>
             
-            {/* ★追加: 情報源へのリンク表示エリア */}
+            {/* 情報源リンク */}
             {selectedOpinion.sourceUrl && (
               <div style={styles.sourceLinkArea}>
                 <a 
@@ -170,8 +190,13 @@ const Frontend = ({ onLoginClick }) => {
             )}
 
             <div style={styles.buttonGroup}>
-              <button style={styles.opposeButton} onClick={() => handleVote('oppose')}>反対</button>
-              <button style={styles.agreeButton} onClick={() => handleVote('agree')}>賛成</button>
+              {/* ★ここから handleVote を呼ぶように修正 */}
+              <button style={styles.agreeButton} onClick={() => handleVote('agree')}>
+                👍 賛成して議論する
+              </button>
+              <button style={styles.opposeButton} onClick={() => handleVote('oppose')}>
+                👎 反対して議論する
+              </button>
             </div>
             <button style={styles.closeButton} onClick={() => setSelectedOpinion(null)}>閉じる</button>
           </div>
@@ -182,15 +207,19 @@ const Frontend = ({ onLoginClick }) => {
         <div style={styles.chatToggle} onClick={() => setIsChatOpen(true)}>◀</div>
       )}
       
+      {/* チャットコンポーネント */}
       <ChatMode 
         isOpen={isChatOpen} 
-        onClose={() => setIsChatOpen(false)} 
+        onClose={handleCloseChat} 
         currentTheme={currentTheme}
-        currentOpinion={selectedOpinion} 
+        currentOpinion={selectedOpinion} // チャットを開く瞬間はnullになっているが、直前の操作は記録されている想定
+        initialMessage={startMessage}    // ★メッセージを渡す
       />
     </div>
   );
 };
+
+// --- サブコンポーネント ---
 
 const FIXED_POSITIONS_5 = [
   { top: '15%', left: '15%' },
@@ -209,7 +238,7 @@ const ThemeListView = ({ themes, onThemeClick }) => (
           ...styles.themeBubble,
           backgroundColor: theme.color || '#ccc',
           left: `${20 + (index * 25)}%`,       
-          top: `${30 + (index % 2 * 30)}%`,    
+          top: `${30 + (index % 2 * 30)}%`,     
         }}
         onClick={() => onThemeClick(theme)}
       >
@@ -289,7 +318,6 @@ const styles = {
   modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, backdropFilter: 'blur(3px)' },
   modal: { backgroundColor: 'white', padding: '50px', borderRadius: '15px', width: '600px', maxWidth: '90%', textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.3)' },
   
-  // ★追加: リンク用のスタイル
   sourceLinkArea: { margin: '10px 0 20px 0', textAlign: 'right' },
   sourceAnchor: { fontSize: '0.9rem', color: '#007bff', textDecoration: 'none', borderBottom: '1px solid #007bff' },
 

@@ -1,10 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { Send, X, Bot, User, Loader2 } from 'lucide-react'; // アイコンライブラリ
+import { Send, X, Bot, User, Loader2 } from 'lucide-react'; 
 import remarkGfm from 'remark-gfm';
 import { sendSidebarChat } from './api_client';
 
-// スタイル定義（CSSファイルに分けてもOKですが、コピペ用にここに書きます）
 const styles = {
   container: {
     width: '480px',
@@ -35,7 +34,7 @@ const styles = {
     padding: '20px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px', // メッセージ間の余白
+    gap: '16px',
     backgroundColor: '#f8f9fa',
   },
   inputArea: {
@@ -57,11 +56,14 @@ const styles = {
   }
 };
 
-const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion }) => {
+const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessage }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  
+  // 自動送信が2回走らないようにするためのフラグ
+  const hasSentInitialRef = useRef(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,26 +73,19 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion }) => {
     scrollToBottom();
   }, [messages, isLoading]);
 
-// ChatMode.js の handleSend 関数
-
-const handleSend = async () => {
-    const text = inputText.trim();
-    if (!text || isLoading) return;
+  // ★修正ポイント1: executeSend を useCallback で包む
+  // これにより、依存する値が変わらない限り関数が再作成されなくなります
+  const executeSend = useCallback(async (textToSend) => {
+    if (!textToSend || isLoading) return;
 
     // UI更新
-    setMessages(prev => [...prev, { text, sender: 'user' }]);
-    setInputText('');
+    setMessages(prev => [...prev, { text: textToSend, sender: 'user' }]);
     setIsLoading(true);
 
     try {
-      // 2. 直接 fetch していた部分を、関数呼び出しに変更
-      /* const response = await fetch('http://localhost:8000/simple-chat', { ... });
-      const data = await response.json(); 
-      */
-     
-      // ↓ こう書き換えるだけでスッキリ！
+      // api_client経由で送信
       const data = await sendSidebarChat(
-        text, 
+        textToSend, 
         messages, 
         currentTheme?.title || "自由テーマ",
         currentOpinion?.title || "未定",
@@ -105,12 +100,34 @@ const handleSend = async () => {
     } finally {
       setIsLoading(false);
     }
+  }, [currentTheme, currentOpinion, isLoading, messages]); // この関数が使う変数を依存配列に指定
+
+  // ★修正ポイント2: 依存配列に executeSend を追加して警告を解消
+  useEffect(() => {
+    if (isOpen && initialMessage && !hasSentInitialRef.current) {
+      executeSend(initialMessage);
+      hasSentInitialRef.current = true; // 送信済みフラグを立てる
+    }
+    
+    // チャットが閉じられたらフラグをリセット
+    if (!isOpen) {
+      hasSentInitialRef.current = false;
+    }
+  }, [isOpen, initialMessage, executeSend]);
+
+  // 手動で送信ボタンを押したときの処理
+  const handleManualSend = () => {
+    const text = inputText.trim();
+    if (!text) return;
+    
+    setInputText(''); // 入力欄をクリア
+    executeSend(text);
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) { // Shift+Enterで改行できるように
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      handleManualSend();
     }
   };
 
@@ -132,8 +149,8 @@ const handleSend = async () => {
       </div>
       
       <div style={styles.messagesArea}>
-        {/* 3. 初期メッセージの変更 */}
-        {messages.length === 0 && (
+        {/* 初期メッセージ（履歴がない場合のみ表示） */}
+        {messages.length === 0 && !isLoading && (
           <div style={{ textAlign: 'center', color: '#999', marginTop: '40px', fontSize: '14px' }}>
             <Bot size={48} style={{ margin: '0 auto 10px', opacity: 0.2 }} />
             <p>
@@ -152,21 +169,19 @@ const handleSend = async () => {
               justifyContent: isUser ? 'flex-end' : 'flex-start',
               gap: '8px'
             }}>
-              {/* Botアイコン（左側） */}
               {!isUser && (
                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
                   <Bot size={16} color="white" />
                 </div>
               )}
 
-              {/* 吹き出し */}
               <div style={{
                 padding: '8px 16px',
                 borderRadius: '16px',
                 borderTopRightRadius: isUser ? '4px' : '16px',
                 borderTopLeftRadius: isUser ? '16px' : '4px',
                 maxWidth: '85%',
-                backgroundColor: isUser ? '#0284c7' : '#ffffff', // ユーザーは濃い青、AIは白
+                backgroundColor: isUser ? '#0284c7' : '#ffffff',
                 color: isUser ? 'white' : '#333',
                 boxShadow: isUser ? 'none' : '0 2px 5px rgba(0,0,0,0.05)',
                 fontSize: '14px',
@@ -176,7 +191,6 @@ const handleSend = async () => {
                 {isUser ? (
                   msg.text
                 ) : (
-                  // Markdownレンダリング（スタイルは簡易的）
                   <ReactMarkdown 
                     remarkPlugins={[remarkGfm]}
                     components={{
@@ -196,7 +210,6 @@ const handleSend = async () => {
                 )}
               </div>
 
-              {/* Userアイコン（右側） */}
               {isUser && (
                 <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
                   <User size={16} color="#64748b" />
@@ -248,7 +261,7 @@ const handleSend = async () => {
             }}
           />
           <button 
-            onClick={handleSend} 
+            onClick={handleManualSend} 
             disabled={!inputText.trim() || isLoading}
             style={{ 
               backgroundColor: inputText.trim() && !isLoading ? '#0284c7' : '#ccc', 
@@ -269,7 +282,6 @@ const handleSend = async () => {
         </div>
       </div>
       
-      {/* ローディングアニメーション用の簡易CSS */}
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }

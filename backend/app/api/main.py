@@ -36,6 +36,11 @@ class ChatRequest(BaseModel):
     content: str
     history: List[ChatMessage]
 
+class UserRegisterRequest(BaseModel):
+    username: str
+    password: str = None
+    nickname: str = None
+
 class AnalysisRequest(BaseModel):
     topic: str
     history: List[ChatMessage]
@@ -259,3 +264,28 @@ async def simple_chat_endpoint(req: SimpleChatRequest):
     except Exception as e:
         print(f"Chat Error: {e}")
         return {"reply": "エラーが発生しました。"}
+        
+@app.post("/api/users/register")
+def api_register_user(req: UserRegisterRequest):
+    print(f"Registering user: {req.username}")
+    new_user_id = str(uuid.uuid4())
+    
+    return {
+        "user": { # ★ここが重要: フロントエンドは data.user.id を探している
+            "id": new_user_id,
+            "username": req.username,
+            "nickname": req.nickname or req.username
+        }
+    }
+
+@app.post("/api/users/login")
+def api_login_user(req: UserRegisterRequest):
+    print(f"Logging in user: {req.username}")
+    return {
+        "user": {
+            "id": "mock-user-id",
+            "username": req.username,
+            "nickname": req.nickname or req.username
+        },
+        "token": "mock-token"
+    }
