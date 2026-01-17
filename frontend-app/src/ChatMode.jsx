@@ -1,9 +1,104 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import ReactMarkdown from 'react-markdown';
+import { Send, X, Bot, User, Loader2, RotateCcw, AlertTriangle } from 'lucide-react'; // AlertTriangleを追加
+import remarkGfm from 'remark-gfm';
+import { sendSidebarChat } from './api_client';
 
-const ChatMode = ({ isOpen, onClose }) => {
+const styles = {
+  container: {
+    width: '480px',
+    maxWidth: '100vw',
+    height: '100%',
+    position: 'fixed',
+    right: 0,
+    top: 0,
+    backgroundColor: '#ffffff',
+    boxShadow: '-4px 0 15px rgba(0,0,0,0.1)',
+    display: 'flex',
+    flexDirection: 'column',
+    zIndex: 1000,
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
+    borderLeft: '1px solid #e0e0e0',
+  },
+  header: {
+    padding: '16px',
+    borderBottom: '1px solid #f0f0f0',
+    backgroundColor: '#fff',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    position: 'relative', // モーダル配置のため
+  },
+  messagesArea: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    backgroundColor: '#f8f9fa',
+    position: 'relative', // モーダル配置のため
+  },
+  inputArea: {
+    padding: '16px',
+    borderTop: '1px solid #f0f0f0',
+    backgroundColor: '#fff',
+  },
+  typingIndicator: {
+    display: 'flex',
+    gap: '4px',
+    padding: '12px 16px',
+    backgroundColor: '#f0f0f0',
+    borderRadius: '16px',
+    borderBottomLeftRadius: '4px',
+    width: 'fit-content',
+    alignItems: 'center',
+    color: '#666',
+    fontSize: '12px'
+  },
+  // ★追加: モーダル用のスタイル
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)', // 少し透けた白背景
+    backdropFilter: 'blur(2px)', // ぼかし効果
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 2000,
+  },
+  confirmModal: {
+    backgroundColor: 'white',
+    padding: '24px',
+    borderRadius: '16px',
+    width: '80%',
+    maxWidth: '320px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+    border: '1px solid #eee',
+    textAlign: 'center',
+    animation: 'fadeIn 0.2s ease-out',
+  },
+  modalButtons: {
+    display: 'flex',
+    gap: '12px',
+    marginTop: '20px',
+    justifyContent: 'center',
+  }
+};
+
+const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessage }) => {
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // ★追加: リセット確認モーダルの表示フラグ
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   const messagesEndRef = useRef(null);
+  const lastProcessedIdRef = useRef(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -11,171 +106,299 @@ const ChatMode = ({ isOpen, onClose }) => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, isLoading]);
 
-  // WebSocket接続を作成し、chat_triggerイベントを監視する
+  const executeSend = useCallback(async (textToSend) => {
+    if (!textToSend || isLoading) return;
+
+    setMessages(prev => [...prev, { text: textToSend, sender: 'user' }]);
+    setIsLoading(true);
+
+    try {
+      const data = await sendSidebarChat(
+        textToSend, 
+        messages, 
+        currentTheme?.title || "自由テーマ",
+        currentOpinion?.title || "未定",
+        currentOpinion?.body || "特になし"
+      );
+
+      setMessages(prev => [...prev, { text: data.reply, sender: 'bot' }]);
+
+    } catch (error) {
+      console.error('Error:', error);
+      setMessages(prev => [...prev, { text: 'エラーが発生しました。', sender: 'bot' }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentTheme, currentOpinion, isLoading, messages]);
+
   useEffect(() => {
-    /*
-    const ws = new WebSocket('ws://localhost:8000/ws'); // バックエンドのWebSocket URLに合わせてください
-
-    ws.onopen = () => {
-      console.log('WebSocket connected');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'chat_trigger') {
-          // トリガー受信時の処理例：メッセージ追加
-          setMessages(prev => [...prev, { text: 'バックエンドからのトリガーを受信しました。', sender: 'bot' }]);
+    if (isOpen && initialMessage) {
+        if (initialMessage.id !== lastProcessedIdRef.current) {
+            executeSend(initialMessage.text);
+            lastProcessedIdRef.current = initialMessage.id;
         }
-      } catch (e) {
-        console.error('Invalid JSON', e);
-      }
-    };
+    }
+  }, [isOpen, initialMessage, executeSend]);
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error', error);
-    };
-
-    ws.onclose = () => {
-      console.log('WebSocket disconnected');
-    };
-
-    return () => {
-      ws.close();
-    };
-    */
-  }, []);
-
-  const handleSend = () => {
+  const handleManualSend = () => {
     const text = inputText.trim();
     if (!text) return;
-
-    // ユーザーメッセージを追加
-    setMessages(prev => [...prev, { text, sender: 'user' }]);
+    
     setInputText('');
-
-    // ダミー応答 (バックエンド未接続のため)
-    setTimeout(() => {
-        setMessages(prev => [...prev, { text: 'AIの応答(ダミー): ' + text, sender: 'bot' }]);
-    }, 500);
-
-    /*
-    // PythonバックエンドにPOSTで送信し、応答を受け取る
-    fetch('/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text })
-    })
-      .then(res => res.json())
-      .then(data => {
-        setMessages(prev => [...prev, { text: 'AIの応答: ' + data.reply, sender: 'bot' }]);
-      })
-      .catch(err => {
-        setMessages(prev => [...prev, { text: 'エラーが発生しました。', sender: 'bot' }]);
-        console.error(err);
-      });
-    */
+    executeSend(text);
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      handleManualSend();
     }
+  };
+
+  // ★修正: リセットボタンを押したとき
+  const handleResetClick = () => {
+    if (messages.length > 0) {
+      setShowResetConfirm(true); // モーダルを表示
+    }
+  };
+
+  // ★追加: 実際にリセットを実行
+  const executeReset = () => {
+    setMessages([]);
+    setInputText('');
+    setShowResetConfirm(false); // モーダルを閉じる
+  };
+
+  // ★追加: キャンセル
+  const cancelReset = () => {
+    setShowResetConfirm(false);
   };
 
   if (!isOpen) return null;
 
   return (
-    <div style={{ 
-        width: '350px', 
-        height: '100%', 
-        position: 'fixed', 
-        right: 0, 
-        top: 0, 
-        backgroundColor: '#f9f9f9', 
-        boxShadow: '-2px 0 5px rgba(0,0,0,0.1)',
-        display: 'flex',
-        flexDirection: 'column',
-        zIndex: 1000,
-        fontFamily: 'Arial, sans-serif',
-        borderLeft: '1px solid #ccc'
-    }}>
-      <div style={{ 
-          padding: '15px', 
-          backgroundColor: '#6c757d', // 画像のヘッダー色に近づける
-          color: 'white', 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center' 
-      }}>
-        <h3 style={{ margin: 0, fontSize: '1.1rem' }}>AIチャット</h3>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer', fontSize: '20px' }}>×</button>
+    <div className="chat-container" style={styles.container}>
+      {/* ★追加: 確認モーダル (全体に被せる) */}
+      {showResetConfirm && (
+        <div className="chat-modal-overlay" style={styles.overlay}>
+          <div className="chat-modal-content" style={styles.confirmModal}>
+            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
+              <div style={{ backgroundColor: '#fee2e2', padding: '12px', borderRadius: '50%', color: '#ef4444' }}>
+                <AlertTriangle size={24} />
+              </div>
+            </div>
+            <h3 style={{ margin: '0 0 8px 0', fontSize: '16px', fontWeight: 'bold', color: '#111' }}>会話をリセットしますか？</h3>
+            <p style={{ margin: 0, fontSize: '13px', color: '#666', lineHeight: '1.5' }}>
+              これまでの会話履歴がすべて消去されます。<br/>この操作は元に戻せません。
+            </p>
+            
+            <div style={styles.modalButtons}>
+              <button 
+                onClick={cancelReset}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: '1px solid #e5e7eb',
+                  backgroundColor: 'white',
+                  color: '#374151',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500'
+                }}
+              >
+                キャンセル
+              </button>
+              <button 
+                onClick={executeReset}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  backgroundColor: '#ef4444',
+                  color: 'white',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  fontWeight: '500',
+                  boxShadow: '0 2px 4px rgba(239, 68, 68, 0.2)'
+                }}
+              >
+                リセットする
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ヘッダー */}
+      <div style={styles.header}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ backgroundColor: '#e0f2fe', padding: '6px', borderRadius: '50%' }}>
+            <Bot size={20} color="#0284c7" />
+          </div>
+          <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: '600', color: '#333' }}>AI Assistant</h3>
+        </div>
+        
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button 
+                onClick={handleResetClick} 
+                title="会話をリセット"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#666', padding: '4px' }}
+            >
+                <RotateCcw size={18} />
+            </button>
+
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#999' }}>
+                <X size={20} />
+            </button>
+        </div>
       </div>
       
-      <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column' }}>
-        {messages.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#888', marginTop: '20px' }}>
-                AIチャットへようこそ。<br/>何か話しかけてください。
-            </div>
-        )}
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            style={{
-              margin: '5px 0',
-              padding: '10px 14px',
-              borderRadius: 10,
-              maxWidth: '85%',
-              alignSelf: msg.sender === 'user' ? 'flex-end' : 'flex-start',
-              backgroundColor: msg.sender === 'user' ? '#d1e7dd' : '#e2e3e5', // 画像の吹き出し色に近づける
-              color: '#333',
-              fontSize: '14px',
-              lineHeight: '1.4'
-            }}
-          >
-            {msg.text}
+      <div style={styles.messagesArea}>
+        {messages.length === 0 && !isLoading && (
+          <div style={{ textAlign: 'center', color: '#999', marginTop: '40px', fontSize: '14px' }}>
+            <Bot size={48} style={{ margin: '0 auto 10px', opacity: 0.2 }} />
+            <p>
+              {currentTheme ? `「${currentTheme.title}」についてですね。` : 'こんにちは！'}
+              <br/>
+              気になったテーマや意見はありましたか？
+            </p>
           </div>
-        ))}
+        )}
+
+        {messages.map((msg, idx) => {
+          const isUser = msg.sender === 'user';
+          return (
+            <div key={idx} style={{ 
+              display: 'flex', 
+              justifyContent: isUser ? 'flex-end' : 'flex-start',
+              gap: '8px'
+            }}>
+              {!isUser && (
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                  <Bot size={16} color="white" />
+                </div>
+              )}
+
+              <div style={{
+                padding: '8px 16px',
+                borderRadius: '16px',
+                borderTopRightRadius: isUser ? '4px' : '16px',
+                borderTopLeftRadius: isUser ? '16px' : '4px',
+                maxWidth: '85%',
+                backgroundColor: isUser ? '#0284c7' : '#ffffff',
+                color: isUser ? 'white' : '#333',
+                boxShadow: isUser ? 'none' : '0 2px 5px rgba(0,0,0,0.05)',
+                fontSize: '14px',
+                lineHeight: '1.5',
+                wordBreak: 'break-word'
+              }}>
+                {isUser ? (
+                  msg.text
+                ) : (
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      code({node, inline, className, children, ...props}) {
+                        return !inline ? (
+                          <div style={{backgroundColor: '#f1f1f1', padding: '8px', borderRadius: '4px', fontSize: '12px', overflowX: 'auto', margin: '8px 0'}}>
+                            <code {...props}>{children}</code>
+                          </div>
+                        ) : (
+                          <code style={{backgroundColor: '#f1f1f1', padding: '2px 4px', borderRadius: '3px'}} {...props}>{children}</code>
+                        )
+                      }
+                    }}
+                  >
+                    {msg.text}
+                  </ReactMarkdown>
+                )}
+              </div>
+
+              {isUser && (
+                <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                  <User size={16} color="#64748b" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {isLoading && (
+          <div style={{ display: 'flex', gap: '8px' }}>
+             <div style={{ width: '28px', height: '28px', borderRadius: '50%', backgroundColor: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <Bot size={16} color="white" />
+              </div>
+              <div style={styles.typingIndicator}>
+                <Loader2 className="animate-spin" size={14} /> 
+                <span>AIが考え中...</span>
+              </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
       
-      <div style={{ padding: 15, borderTop: '1px solid #ccc', backgroundColor: '#fff' }}>
-        <div style={{ display: 'flex' }}>
-            <input
+      <div style={styles.inputArea}>
+        <div style={{ 
+          display: 'flex', 
+          backgroundColor: '#f0f2f5', 
+          borderRadius: '24px', 
+          padding: '4px 4px 4px 16px',
+          border: '1px solid transparent',
+          transition: 'border 0.2s',
+        }}>
+          <input
             type="text"
             placeholder="メッセージを入力..."
             value={inputText}
             onChange={e => setInputText(e.target.value)}
             onKeyDown={handleKeyDown}
+            disabled={isLoading}
             style={{ 
-                flexGrow: 1, 
-                padding: '10px', 
-                borderRadius: '20px', 
-                border: '1px solid #ccc', 
-                marginRight: '10px',
-                outline: 'none'
+              flexGrow: 1, 
+              background: 'transparent',
+              border: 'none', 
+              outline: 'none',
+              fontSize: '14px',
+              padding: '8px 0'
             }}
-            />
-            <button onClick={handleSend} style={{ 
-                padding: '10px 15px', 
-                backgroundColor: '#007bff', 
-                color: 'white', 
-                border: 'none', 
-                borderRadius: '50%', 
-                cursor: 'pointer',
-                width: '40px',
-                height: '40px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-            }}>
-            ➤
-            </button>
+          />
+          <button 
+            onClick={handleManualSend} 
+            disabled={!inputText.trim() || isLoading}
+            style={{ 
+              backgroundColor: inputText.trim() && !isLoading ? '#0284c7' : '#ccc', 
+              color: 'white', 
+              border: 'none', 
+              borderRadius: '50%', 
+              width: '36px', 
+              height: '36px', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              cursor: inputText.trim() && !isLoading ? 'pointer' : 'default',
+              transition: 'background-color 0.2s'
+            }}
+          >
+            <Send size={16} />
+          </button>
         </div>
       </div>
+      
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+          animation: spin 1s linear infinite;
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
     </div>
   );
 };

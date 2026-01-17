@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+// ★追加: 作った関数をインポート
+import { authUser } from './api_client';
 
 const Login = ({ onLoginSuccess }) => {
   const [nickname, setNickname] = useState('');
@@ -7,24 +9,11 @@ const Login = ({ onLoginSuccess }) => {
     if (!nickname) return alert("ニックネームを入力してください");
 
     try {
-      // 1. バックエンドのエンドポイントを選択
-      const endpoint = type === 'register' ? '/api/users/register' : '/api/users/login';
-
-      // 2. 実際の API 通信を実行
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nickname }) 
-      });
-
-      const data = await response.json();
-
-      // 3. サーバーエラー（重複など）のハンドリング
-      if (!response.ok) {
-        throw new Error(data.detail || "認証に失敗しました");
-      }
+      // ★修正: 直接 fetch せず、共通の関数を使う
+      const data = await authUser(type, nickname);
 
       // 4. サーバーが発行した本物の情報をブラウザに保存
+      // (main.pyを修正したので、data.user がちゃんと存在するはず)
       localStorage.setItem('userId', data.user.id);
       localStorage.setItem('nickname', data.user.nickname);
       
@@ -34,12 +23,13 @@ const Login = ({ onLoginSuccess }) => {
         onLoginSuccess();
       }
     } catch (error) {
+      console.error(error);
       alert("エラー: " + error.message);
     }
   };
 
   return (
-    <div style={{ padding: '40px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px' }}>
+    <div style={{ padding: '40px', textAlign: 'center', border: '1px solid #ddd', borderRadius: '8px', background: 'white' }}>
       <h2>ログイン / 新規登録</h2>
       <div style={{ marginBottom: '20px' }}>
         <input
@@ -47,12 +37,22 @@ const Login = ({ onLoginSuccess }) => {
           placeholder="ニックネームを入力してください"
           value={nickname}
           onChange={(e) => setNickname(e.target.value)}
-          style={{ padding: '10px', width: '250px' }}
+          style={{ padding: '10px', width: '250px', fontSize: '16px' }}
         />
       </div>
       <div>
-        <button onClick={() => handleAction('register')} style={{ marginRight: '10px' }}>新規登録</button>
-        <button onClick={() => handleAction('login')}>ログイン</button>
+        <button 
+          onClick={() => handleAction('register')} 
+          style={{ marginRight: '10px', padding: '10px 20px', cursor: 'pointer' }}
+        >
+          新規登録
+        </button>
+        <button 
+          onClick={() => handleAction('login')}
+          style={{ padding: '10px 20px', cursor: 'pointer', backgroundColor: '#0284c7', color: 'white', border: 'none', borderRadius: '4px' }}
+        >
+          ログイン
+        </button>
       </div>
     </div>
   );
