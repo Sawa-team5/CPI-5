@@ -179,11 +179,11 @@ const ChatMode = ({ isOpen, onClose, currentTheme, currentOpinion, initialMessag
   if (!isOpen) return null;
 
   return (
-    <div style={styles.container}>
+    <div className="chat-container" style={styles.container}>
       {/* ★追加: 確認モーダル (全体に被せる) */}
       {showResetConfirm && (
-        <div style={styles.overlay}>
-          <div style={styles.confirmModal}>
+        <div className="chat-modal-overlay" style={styles.overlay}>
+          <div className="chat-modal-content" style={styles.confirmModal}>
             <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center' }}>
               <div style={{ backgroundColor: '#fee2e2', padding: '12px', borderRadius: '50%', color: '#ef4444' }}>
                 <AlertTriangle size={24} />

@@ -190,8 +190,8 @@ const Frontend = ({ onLoginClick }) => {
   };
 
   return (
-    <div style={dynamicStyles.container}>
-      <div style={dynamicStyles.sidebar}>
+    <div className="app-container" style={dynamicStyles.container}>
+      <div className="app-sidebar" style={dynamicStyles.sidebar}>
         <h3 style={isMobile ? {fontSize: '1.2rem', margin: 0, fontWeight:'bold'} : styles.sidebarTitle}>Polyphony</h3>
         
         {/* PC表示時のみリストなどを表示 */}
@@ -205,7 +205,7 @@ const Frontend = ({ onLoginClick }) => {
               </div>
             )}
 
-            <ul style={styles.themeList}>
+            <ul className="theme-list" style={styles.themeList}>
               {themes.map(theme => (
                 <li 
                   key={theme.id} 
@@ -247,7 +247,7 @@ const Frontend = ({ onLoginClick }) => {
         )}
       </div>
 
-      <div style={dynamicStyles.main}>
+      <div className="app-main" style={dynamicStyles.main}>
         {currentTheme ? (
           <ThemeDetailView 
             theme={currentTheme} 
@@ -261,8 +261,8 @@ const Frontend = ({ onLoginClick }) => {
       </div>
 
       {selectedOpinion && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
+        <div className="modal-overlay" style={styles.modalOverlay}>
+          <div className="modal-content" style={styles.modal}>
             <h3 style={{color: selectedOpinion.color || '#333'}}>{selectedOpinion.title}</h3>
             
             <p style={{margin: '20px 0', lineHeight: '1.6'}}>{selectedOpinion.body}</p>
@@ -311,10 +311,11 @@ const Frontend = ({ onLoginClick }) => {
 // --- サブコンポーネント ---
 
 const ThemeListView = ({ themes, onThemeClick, isMobile }) => (
-  <div style={styles.bubbleContainer}>
+  <div className="bubble-container" style={styles.bubbleContainer}>
     {themes.map((theme, index) => (
       <div
         key={theme.id}
+        className="theme-bubble"
         style={{
           ...styles.themeBubble,
           backgroundColor: theme.color || '#ccc',
@@ -363,7 +364,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
   const selfLeft = ((selfScore + 100) / 200) * range + offset;
 
   return (
-    <div style={styles.detailContainer}>
+    <div className="detail-container" style={styles.detailContainer}>
       <h2 style={{...styles.pageTitle, borderColor: theme.color}}>{theme.title}</h2>
       
       <div style={styles.bubblesArea}>
@@ -372,6 +373,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
           return (
             <div
               key={op.id}
+              className="opinion-bubble"
               style={{
                 ...styles.opinionBubble,
                 left: pos.left,
@@ -392,6 +394,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
         
         {/* 自分バブル */}
         <div
+          className="self-bubble"
           style={{
             ...styles.selfBubble,
             left: `${selfLeft}%`,

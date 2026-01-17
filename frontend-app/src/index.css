@@ -11,3 +11,130 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Landscape Mode Adjustments for Smartphone */
+@media screen and (orientation: landscape) and (max-height: 500px) {
+  
+  /* サイドバー調整: 常に表示し、スクロール可能に */
+  .app-sidebar {
+    width: 180px !important;
+    min-width: 180px !important;
+    padding: 10px !important;
+    overflow-y: auto !important;
+    height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    /* スクロールバーを細くする */
+    scrollbar-width: thin;
+  }
+
+  .app-sidebar h3 {
+    font-size: 1.1rem !important;
+    margin-bottom: 10px !important;
+  }
+  
+  .theme-list li {
+    padding: 8px 10px !important;
+    margin-bottom: 4px !important;
+    font-size: 0.8rem !important;
+  }
+  
+  /* ユーザー情報エリア */
+  .app-sidebar > div:last-child {
+      padding: 10px !important;
+      margin-top: 10px !important;
+  }
+
+  /* メインエリア調整 */
+  .app-main {
+    height: 100vh !important;
+    flex: 1 !important;
+  }
+  
+  .detail-container {
+    padding: 10px !important;
+  }
+  
+  .detail-container h2 {
+    font-size: 1.3rem !important;
+    margin-bottom: 5px !important;
+    border-left-width: 5px !important;
+    padding-left: 10px !important;
+  }
+
+  /* バブルサイズ調整 */
+  .theme-bubble {
+    width: 100px !important;
+    height: 100px !important;
+    font-size: 0.8rem !important;
+  }
+  
+  .opinion-bubble {
+    width: 100px !important;    
+    height: 100px !important;
+    font-size: 0.8rem !important;
+    padding: 5px !important;
+  }
+  
+  .self-bubble {
+    width: 60px !important;
+    height: 60px !important;
+    font-size: 0.7rem !important;
+  }
+
+  /* 軸ラベル調整 */
+  .detail-container > div:last-child {
+      height: 40px !important; /* axisContainer */
+  }
+  
+  /* チャットトグルボタン */
+  div[style*="borderTopLeftRadius: 10px"] {
+      width: 30px !important;
+      height: 60px !important;
+      font-size: 1rem !important;
+  }
+  
+  /* Chatモード */
+  .chat-container {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* モーダルのレスポンシブ対応 (縦幅が狭い場合全般: 横向きスマホ含む) */
+@media screen and (max-height: 600px) {
+  .modal-overlay {
+    align-items: flex-start !important;
+    padding: 10px !important;
+    overflow-y: auto !important; /* 縦スクロール有効 */
+  }
+
+  .modal-content {
+    margin-top: 10px !important;
+    margin-bottom: 10px !important;
+    padding: 20px !important;
+    width: 90% !important;
+    max-width: 600px !important;
+    height: auto !important; 
+    overflow: visible !important;
+    max-height: none !important; /* コンテンツが溢れたらoverlay側でスクロール */
+  }
+  
+  .modal-content h3 {
+      font-size: 1.1rem !important;
+      margin-bottom: 10px !important;
+  }
+  
+  .modal-content p {
+      font-size: 0.9rem !important;
+      line-height: 1.4 !important;
+      margin: 10px 0 !important;
+  }
+
+  .modal-content button {
+    padding: 8px 15px !important;
+    font-size: 0.85rem !important;
+    margin: 5px !important;
+  }
+}
+
