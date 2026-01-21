@@ -323,7 +323,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
                 left: pos.left,
                 top: pos.top,
                 // 透明度0.85(85%)にして少し透けさせる
-                backgroundColor: hexToRgba(baseColor, 0.85),
+                backgroundColor: hexToRgba(baseColor, 0.4),
                 // 透過しても輪郭がわかるように同色の枠線をつける
                 border: `2px solid ${baseColor}`,
                 width: isMobile ? '105px' : '150px',
