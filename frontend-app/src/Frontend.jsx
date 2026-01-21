@@ -268,6 +268,23 @@ const ThemeListView = ({ themes, onThemeClick, isMobile }) => (
   </div>
 );
 
+// ★追加: カラーコード(HEX)をRGBAに変換して透明度を付与する関数
+// これで、バブルが重なったときに薄く透けて見えるようになる
+const hexToRgba = (hex, alpha) => {
+  if (!hex) return `rgba(200, 200, 200, ${alpha})`;
+  let c = hex;
+  // #RGB または #RRGGBB 形式に対応
+  if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(c)) {
+    c = c.substring(1).split('');
+    if (c.length === 3) {
+      c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+    }
+    c = '0x' + c.join('');
+    return 'rgba(' + [(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',') + ',' + alpha + ')';
+  }
+  return hex;
+};
+
 const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
   const opinions = theme.opinions.slice(0, 5);
   
@@ -295,6 +312,8 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
       <div style={styles.bubblesArea}>
         {opinions.map((op) => {
           const pos = bubblePositions[op.id] || { top: '50%', left: '50%' };
+          // ★修正: ここに baseColor の定義がひつよう
+          const baseColor = op.color || theme.color;
           return (
             <div
               key={op.id}
@@ -303,7 +322,10 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
                 ...styles.opinionBubble,
                 left: pos.left,
                 top: pos.top,
-                backgroundColor: op.color || theme.color, 
+                // 透明度0.85(85%)にして少し透けさせる
+                backgroundColor: hexToRgba(baseColor, 0.85),
+                // 透過しても輪郭がわかるように同色の枠線をつける
+                border: `2px solid ${baseColor}`,
                 width: isMobile ? '105px' : '150px',
                 height: isMobile ? '105px' : '150px',
                 fontSize: isMobile ? '0.75rem' : '0.9rem',
