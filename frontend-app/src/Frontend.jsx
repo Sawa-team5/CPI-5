@@ -207,7 +207,12 @@ const Frontend = ({ onLoginClick }) => {
       {selectedOpinion && (
         <div className="modal-overlay" onClick={() => setSelectedOpinion(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{color: selectedOpinion.color || '#333'}}>{selectedOpinion.title}</h3>
+            <h3 style={{
+              color: '#333',
+              borderLeft: `6px solid ${selectedOpinion.color || '#ccc'}`,
+              paddingLeft: '12px',
+              marginBottom: '15px'
+            }}>{selectedOpinion.title}</h3>
             <p className="modal-body-text">{selectedOpinion.body}</p>
             
             {selectedOpinion.sourceUrl && (
