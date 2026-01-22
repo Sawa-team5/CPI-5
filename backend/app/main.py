@@ -8,10 +8,15 @@ from app.services.supabase_service import init_supabase
 app = FastAPI(title="Kaleidoscope Backend")
 
 # CORS設定
-# フロントエンド（React）からのリクエストを許可
+# 許可するオリジンのリスト
+origins = [
+    "http://localhost:3000",          # ローカル開発環境用
+    "https://cpi-5-k60xkc0d1-cpi-5s-projects.vercel.app" # ここにSawaさんから共有されたVercelのURLを入れる
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 開発環境では全てのオリジンを許可
+    allow_origins=origins,  # 特定のURLのみ許可
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
