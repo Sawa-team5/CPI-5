@@ -299,10 +299,10 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
   
   const bubblePositions = useMemo(() => {
     const positions = {};
-    const Y_PATTERNS = [20, 60, 30, 70, 40]; 
+    const Y_PATTERNS = [15, 75, 30, 60, 45]; 
     opinions.forEach((op, index) => {
         const score = op.score || 0;
-        const range = isMobile ? 65 : 85;
+        const range = isMobile ? 64 : 84;
         const offset = isMobile ? 18 : 8;
         const left = ((score + 100) / 200) * range + offset;
         positions[op.id] = { left: `${left}%`, top: `${Y_PATTERNS[index % Y_PATTERNS.length]}%` };
@@ -334,9 +334,9 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
                 // 透明度0.85(85%)にして少し透けさせる
                 backgroundColor: hexToRgba(baseColor, 0.4),
                 // 透過しても輪郭がわかるように同色の枠線をつける
-                border: `2px solid ${baseColor}`,
+                border: `1px solid ${baseColor}`,
                 width: isMobile ? '105px' : '150px',
-                height: isMobile ? '105px' : '150px',
+                height: isMobile ? '65px' : '80px',
                 fontSize: isMobile ? '0.75rem' : '0.9rem',
               }}
               onClick={() => onOpinionClick(op)}
@@ -351,7 +351,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
           style={{
             ...styles.selfBubble,
             left: `${selfLeft}%`,
-            top: '85%', 
+            top: '95%', 
             width: isMobile ? '60px' : '80px',
             height: isMobile ? '60px' : '80px',
           }}
