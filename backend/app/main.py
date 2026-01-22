@@ -12,11 +12,13 @@ app = FastAPI(title="Kaleidoscope Backend")
 origins = [
     "http://localhost:3000",          # ローカル開発環境用
     "https://cpi-5.vercel.app"
+    "https://cpi-5-sawa-team5s-projects.vercel.app", # プロジェクトの共通ドメイン
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # 特定のURLのみ許可
+    # allow_origins=origins,  # 特定のURLのみ許可
+    allow_origins=["*"],  # ここを ["*"] に書き換えると全てのURLを許可します
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
