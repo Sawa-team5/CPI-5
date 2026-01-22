@@ -11,7 +11,7 @@ app = FastAPI(title="Kaleidoscope Backend")
 # 許可するオリジンのリスト
 origins = [
     "http://localhost:3000",          # ローカル開発環境用
-    "https://cpi-5-k60xkc0d1-cpi-5s-projects.vercel.app"
+    "https://cpi-5.vercel.app"
 ]
 
 app.add_middleware(
