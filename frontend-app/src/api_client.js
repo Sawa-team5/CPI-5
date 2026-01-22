@@ -1,8 +1,8 @@
 // src/api_client.js
 
 // PythonサーバーのURL (FastAPI)
-// ★重要: Frontend.jsx で使うために export をつけます
-export const BASE_URL = "https://humble-space-goldfish-qjjw9gv45qpc9jgr-8000.app.github.dev";
+// 環境変数があればそれを使い、なければローカル（開発用）を使います
+export const BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
 export const API_BASE_URL = `${BASE_URL}/api`;
 
 // 1. 全テーマを取得 (初期表示用)
