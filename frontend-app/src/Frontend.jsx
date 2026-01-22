@@ -122,7 +122,11 @@ const Frontend = ({ onLoginClick }) => {
             const res = await fetch(`${API_BASE_URL}/vote`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-User-ID': userId },
-                body: JSON.stringify({ opinionId: selectedOpinion.id, voteType: type })
+                body: JSON.stringify({ 
+                    opinionId: selectedOpinion.id, 
+                    voteType: type,
+                    themeId: currentTheme.id
+                })
             });
             if (res.ok) {
                 const data = await res.json();

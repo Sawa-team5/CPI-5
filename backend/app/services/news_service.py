@@ -17,33 +17,29 @@ class NewsService:
         score = user_data.get(theme_id, 0.0)
         return {"user_id": user_id, "theme_id": theme_id, "stance_score": score}
 
-    async def update_stance_score(self, user_id: str, opinion_id: str, vote_type: str):
+    async def update_stance_score(self, user_id: str, theme_id: str, opinion_id: str, vote_type: str):
         # 1. 意見の本当のスコアを取得
         opinion_score = self._get_opinion_score(opinion_id)
         
         # ユーザーの現在地取得
-        theme_id = "current_theme" 
         user_data = user_stances_db.get(user_id, {})
         current_score = user_data.get(theme_id, 0.0)
 
-        # --- 計算ロジック: 通り過ぎない方式 (距離を詰める) ---
+        # --- 計算ロジック ---
 
-        # 影響率 (0.5 = 相手との距離の半分まで進む)
+        # 影響率
         INFLUENCE_RATE = 0.5
-
-        # まず「距離（差分）」を計算
-        diff = opinion_score - current_score
 
         move_amount = 0.0 # 初期化
 
         if vote_type == 'agree':
             # 【賛成】差を縮める（引力）
-            move_amount = diff * INFLUENCE_RATE
+            move_amount = opinion_score * INFLUENCE_RATE
             
         elif vote_type == 'oppose':
             # 【反対】差を広げる（反発力）
             # 逆方向に動く
-            move_amount = -1 * (diff * INFLUENCE_RATE)
+            move_amount = -1 * (opinion_score * INFLUENCE_RATE)
 
         # --------------------------------------------------
 

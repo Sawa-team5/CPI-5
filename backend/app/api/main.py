@@ -303,6 +303,7 @@ def api_login_user(req: UserRegisterRequest):
 class VoteRequest(BaseModel):
     opinionId: str
     voteType: str
+    themeId: str
 
 @app.post("/api/vote")
 async def api_vote(req: VoteRequest, x_user_id: str = Header(None, alias="X-User-ID")):
@@ -310,8 +311,7 @@ async def api_vote(req: VoteRequest, x_user_id: str = Header(None, alias="X-User
     user_id = x_user_id or "default_user"
     
     result = await news_service.update_stance_score(
-        user_id=user_id,
-        opinion_id=req.opinionId,
+        user_id=user_id,        theme_id=req.themeId,        opinion_id=req.opinionId,
         vote_type=req.voteType
     )
     return result
