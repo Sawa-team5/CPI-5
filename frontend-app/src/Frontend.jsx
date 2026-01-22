@@ -152,7 +152,7 @@ const Frontend = ({ onLoginClick }) => {
     <div className="app-container" style={containerStyle}>
       {/* サイドバー: PCレイアウトとして常に表示 */}
       <div className="app-sidebar" style={sidebarStyle}>
-        <h3 style={styles.sidebarTitle}>Polyphony</h3>
+        <h3 style={styles.sidebarTitle}>Kaleidoscope</h3>
         
         <h4 style={{fontSize: '0.9rem', marginBottom: '10px', opacity: 0.8}}>テーマ一覧</h4>
         {isGenerating && themes.length === 0 && (
