@@ -356,8 +356,8 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
             left: `${selfLeft}%`,
             top: '95%',
             // ★反映: スマホ版の自分バブルサイズを縮小 (60px -> 45px)
-            width: isMobile ? '45px' : '80px',
-            height: isMobile ? '45px' : '80px',
+            width: isMobile ? '25px' : '80px',
+            height: isMobile ? '25px' : '80px',
           }}
         >
           {/* 文字サイズも調整 */}
