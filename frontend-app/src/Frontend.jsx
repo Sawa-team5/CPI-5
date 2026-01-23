@@ -26,7 +26,8 @@ const useWindowSize = () => {
   return {
     width: windowSize.width,
     height: windowSize.height,
-    isMobile: windowSize.width < 768,
+    // ★修正：横幅が768px未満、または高さが500px未満（スマホ横向き想定）ならモバイル判定
+    isMobile: windowSize.width < 768 || windowSize.height < 500,
   };
 };
 
