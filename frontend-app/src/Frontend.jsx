@@ -26,7 +26,7 @@ const useWindowSize = () => {
   return {
     width: windowSize.width,
     height: windowSize.height,
-    // ★修正：横幅が768px未満、または高さが500px未満（スマホ横向き想定）ならモバイル判定
+    // 横幅が768px未満、または高さが500px未満ならモバイル判定
     isMobile: windowSize.width < 768 || windowSize.height < 500,
   };
 };
@@ -43,9 +43,6 @@ const Frontend = ({ onLoginClick }) => {
 
   const initializedRef = useRef(false);
   const { isMobile: isSmallScreen } = useWindowSize();
-
-  // PCレイアウトを強制
-  const isMobileLayout = false;
 
   useEffect(() => {
     const storedNickname = localStorage.getItem('nickname');
@@ -142,12 +139,9 @@ const Frontend = ({ onLoginClick }) => {
     setIsChatOpen(true);
   };
 
-  const containerStyle = { ...styles.container, flexDirection: 'row' };
-  const sidebarStyle = { ...styles.sidebar };
-
   return (
-    <div className="app-container" style={containerStyle}>
-      <div className="app-sidebar" style={sidebarStyle}>
+    <div className="app-container" style={{ ...styles.container, flexDirection: 'row' }}>
+      <div className="app-sidebar" style={styles.sidebar}>
         <h3 style={styles.sidebarTitle}>Kaleidoscope</h3>
         <h4 style={{ fontSize: '0.9rem', marginBottom: '10px', opacity: 0.8 }}>テーマ一覧</h4>
         {isGenerating && themes.length === 0 && (
@@ -210,7 +204,6 @@ const Frontend = ({ onLoginClick }) => {
               marginBottom: '15px'
             }}>{selectedOpinion.title}</h3>
             <p className="modal-body-text">{selectedOpinion.body}</p>
-
             {selectedOpinion.sourceUrl && (
               <div style={styles.sourceLinkArea}>
                 <a href={selectedOpinion.sourceUrl} target="_blank" rel="noopener noreferrer" style={styles.sourceAnchor}>
@@ -218,7 +211,6 @@ const Frontend = ({ onLoginClick }) => {
                 </a>
               </div>
             )}
-
             <div style={styles.buttonGroup}>
               <button style={styles.agreeButton} onClick={() => handleVote('agree')}>👍 賛成して議論</button>
               <button style={styles.opposeButton} onClick={() => handleVote('oppose')}>👎 反対して議論</button>
@@ -289,8 +281,8 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
   const bubblePositions = useMemo(() => {
     const positions = {};
     const colorPatterns = {
-      group0: [25, 55, 85],
-      group1: [15, 45, 70],
+      group0: [25, 55, 85], // 1色目のY座標パターン
+      group1: [15, 45, 70], // 2色目のY座標パターン
     };
     const uniqueColors = Array.from(new Set(opinions.map(op => op.color || theme.color)));
     const colorCounters = {};
@@ -299,10 +291,12 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
       const color = op.color || theme.color;
       const colorIndex = uniqueColors.indexOf(color);
       const groupKey = `group${colorIndex % 2}`;
+
       if (colorCounters[groupKey] === undefined) colorCounters[groupKey] = 0;
       const count = colorCounters[groupKey];
       const pattern = colorPatterns[groupKey];
       const topValue = pattern[count % pattern.length];
+
       const range = isMobile ? 64 : 84;
       const offset = isMobile ? 18 : 8;
       const left = ((op.score + 100) / 200) * range + offset;
@@ -320,12 +314,14 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
   return (
     <div className="detail-container" style={{
       ...styles.detailContainer,
-      // ★反映: スマホ版のみ下部の余白を極小にして、バーを画面下端へ寄せる
       paddingBottom: isMobile ? '5px' : '20px'
     }}>
       <h2 className="theme-detail-title" style={{ ...styles.pageTitle, borderColor: theme.color }}>{theme.title}</h2>
 
-      <div style={styles.bubblesArea}>
+      <div style={{
+        ...styles.bubblesArea,
+        marginBottom: isMobile ? '10px' : '30px'
+      }}>
         {opinions.map((op) => {
           const pos = bubblePositions[op.id] || { top: '50%', left: '50%' };
           const baseColor = op.color || theme.color;
@@ -350,17 +346,17 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
           );
         })}
 
+        {/* 自分バブル: スマホ版では枠線を細くし、賛成/反対バーに接地させる */}
         <div
           className="self-bubble"
           style={{
             ...styles.selfBubble,
             left: `${selfLeft}%`,
-            // ★修正1: スマホの時だけ位置をさらに下（95% -> 98%など）に下げる
-            top: isMobile ? '98%' : '95%',
+            top: isMobile ? '100%' : '95%',
             width: isMobile ? '60px' : '80px',
             height: isMobile ? '60px' : '80px',
-            // ★修正2: スマホの時だけ枠線を細く（3px -> 1pxなど）する
             border: isMobile ? '1px solid #333' : '3px solid #333',
+            zIndex: 10,
           }}
         >
           <span style={{ fontSize: '0.7rem', display: 'block' }}>自分</span>
@@ -402,7 +398,7 @@ const styles = {
   pageTitle: { fontSize: '1.8rem', marginBottom: '15px', color: '#333', borderLeft: '8px solid #ccc', paddingLeft: '15px' },
   bubblesArea: { flex: 1, position: 'relative', marginBottom: '30px' },
   opinionBubble: { position: 'absolute', borderRadius: '50%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '10px', cursor: 'pointer', boxShadow: '0 5px 15px rgba(0,0,0,0.15)', transform: 'translate(-50%, -50%)', zIndex: 2, color: '#333', fontWeight: 'bold' },
-  selfBubble: { position: 'absolute', borderRadius: '50%', backgroundColor: 'white', border: 'px solid #333', color: '#333', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', transform: 'translate(-50%, -50%)', zIndex: 3, boxShadow: '0 2px 5px rgba(0,0,0,0.2)', transition: 'left 0.5s ease-out' },
+  selfBubble: { position: 'absolute', borderRadius: '50%', backgroundColor: 'white', color: '#333', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', transform: 'translate(-50%, -50%)', zIndex: 3, boxShadow: '0 2px 5px rgba(0,0,0,0.2)', transition: 'left 0.5s ease-out' },
   axisContainer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px', width: '100%', padding: '0 10px' },
   axisLabelLeft: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
   axisLabelRight: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
