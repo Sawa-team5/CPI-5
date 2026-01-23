@@ -355,15 +355,16 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
           style={{
             ...styles.selfBubble,
             left: `${selfLeft}%`,
-            top: '95%',
-            // ★反映: スマホ版の自分バブルサイズを縮小 (60px -> 45px)
-            width: isMobile ? '25px' : '80px',
-            height: isMobile ? '25px' : '80px',
+            // ★修正1: スマホの時だけ位置をさらに下（95% -> 98%など）に下げる
+            top: isMobile ? '98%' : '95%',
+            width: isMobile ? '60px' : '80px',
+            height: isMobile ? '60px' : '80px',
+            // ★修正2: スマホの時だけ枠線を細く（3px -> 1pxなど）する
+            border: isMobile ? '1px solid #333' : '3px solid #333',
           }}
         >
-          {/* 文字サイズも調整 */}
-          <span style={{ fontSize: isMobile ? '0.6rem' : '0.7rem', display: 'block' }}>自分</span>
-          <span style={{ fontSize: isMobile ? '0.7rem' : '0.8rem' }}>{Math.round(selfScore)}</span>
+          <span style={{ fontSize: '0.7rem', display: 'block' }}>自分</span>
+          <span style={{ fontSize: '0.8rem' }}>{Math.round(selfScore)}</span>
         </div>
       </div>
 
@@ -401,7 +402,7 @@ const styles = {
   pageTitle: { fontSize: '1.8rem', marginBottom: '15px', color: '#333', borderLeft: '8px solid #ccc', paddingLeft: '15px' },
   bubblesArea: { flex: 1, position: 'relative', marginBottom: '30px' },
   opinionBubble: { position: 'absolute', borderRadius: '50%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '10px', cursor: 'pointer', boxShadow: '0 5px 15px rgba(0,0,0,0.15)', transform: 'translate(-50%, -50%)', zIndex: 2, color: '#333', fontWeight: 'bold' },
-  selfBubble: { position: 'absolute', borderRadius: '50%', backgroundColor: 'white', border: '3px solid #333', color: '#333', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', transform: 'translate(-50%, -50%)', zIndex: 3, boxShadow: '0 2px 5px rgba(0,0,0,0.2)', transition: 'left 0.5s ease-out' },
+  selfBubble: { position: 'absolute', borderRadius: '50%', backgroundColor: 'white', border: 'px solid #333', color: '#333', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', transform: 'translate(-50%, -50%)', zIndex: 3, boxShadow: '0 2px 5px rgba(0,0,0,0.2)', transition: 'left 0.5s ease-out' },
   axisContainer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px', width: '100%', padding: '0 10px' },
   axisLabelLeft: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
   axisLabelRight: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
