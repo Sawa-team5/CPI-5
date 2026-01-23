@@ -5,7 +5,6 @@ import { fetchThemes, createThemeByAI, API_BASE_URL } from './api_client';
 
 /**
  * 画面サイズを監視するカスタムフック
- * レイアウト判定用とサイズ計算用のフラグを分離して提供
  */
 const useWindowSize = () => {
   const [windowSize, setWindowSize] = useState({
@@ -27,7 +26,7 @@ const useWindowSize = () => {
   return {
     width: windowSize.width,
     height: windowSize.height,
-    isMobile: windowSize.width < 768, // バブルサイズ等の計算用
+    isMobile: windowSize.width < 768,
   };
 };
 
@@ -42,11 +41,9 @@ const Frontend = ({ onLoginClick }) => {
   const [startMessage, setStartMessage] = useState(null);
 
   const initializedRef = useRef(false);
-
-  // 画面サイズの取得
   const { isMobile: isSmallScreen } = useWindowSize();
 
-  // ★変更: レイアウト分岐用フラグは常にfalseにしてPCレイアウトを強制
+  // PCレイアウトを強制
   const isMobileLayout = false;
 
   useEffect(() => {
@@ -144,21 +141,17 @@ const Frontend = ({ onLoginClick }) => {
     setIsChatOpen(true);
   };
 
-  // PCレイアウトを基本とするスタイル設定
   const containerStyle = { ...styles.container, flexDirection: 'row' };
   const sidebarStyle = { ...styles.sidebar };
 
   return (
     <div className="app-container" style={containerStyle}>
-      {/* サイドバー: PCレイアウトとして常に表示 */}
       <div className="app-sidebar" style={sidebarStyle}>
         <h3 style={styles.sidebarTitle}>Kaleidoscope</h3>
-
         <h4 style={{ fontSize: '0.9rem', marginBottom: '10px', opacity: 0.8 }}>テーマ一覧</h4>
         {isGenerating && themes.length === 0 && (
           <div style={{ color: '#fff', padding: '10px', fontSize: '0.8rem' }}>AIが話題を生成中...</div>
         )}
-
         <ul className="theme-list" style={styles.themeList}>
           {themes.map(theme => (
             <li
@@ -175,7 +168,6 @@ const Frontend = ({ onLoginClick }) => {
             </li>
           ))}
         </ul>
-
         <div style={styles.userInfoArea}>
           {nickname ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -196,7 +188,7 @@ const Frontend = ({ onLoginClick }) => {
             theme={currentTheme}
             selfScore={selfScore}
             onOpinionClick={(op) => setSelectedOpinion(op)}
-            isMobile={isSmallScreen} // バブルサイズの調整に使用
+            isMobile={isSmallScreen}
           />
         ) : (
           <ThemeListView
@@ -207,7 +199,6 @@ const Frontend = ({ onLoginClick }) => {
         )}
       </div>
 
-      {/* モーダル表示 */}
       {selectedOpinion && (
         <div className="modal-overlay" onClick={() => setSelectedOpinion(null)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -277,12 +268,9 @@ const ThemeListView = ({ themes, onThemeClick, isMobile }) => (
   </div>
 );
 
-// ★追加: カラーコード(HEX)をRGBAに変換して透明度を付与する関数
-// これで、バブルが重なったときに薄く透けて見えるようになる
 const hexToRgba = (hex, alpha) => {
   if (!hex) return `rgba(200, 200, 200, ${alpha})`;
   let c = hex;
-  // #RGB または #RRGGBB 形式に対応
   if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(c)) {
     c = c.substring(1).split('');
     if (c.length === 3) {
@@ -295,63 +283,45 @@ const hexToRgba = (hex, alpha) => {
 };
 
 const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
-  const opinions = theme.opinions.slice(0, 10); // 表示件数を考慮
+  const opinions = theme.opinions.slice(0, 10);
 
   const bubblePositions = useMemo(() => {
     const positions = {};
-
-    // 1. 色ごとの縦位置リストを定義 (3グループ想定)
-    // グループごとの「高さの帯」を分けるイメージです
     const colorPatterns = {
-      group0: [25, 55, 85], // 1つ目の色のy軸位置パターン
-      group1: [14, 40, 70], // 2つ目の色のy軸位置パターン
+      group0: [25, 55, 85],
+      group1: [15, 45, 70],
     };
-
-    // 色をグループ（0, 1, 2）に割り当てるためのマップ
     const uniqueColors = Array.from(new Set(opinions.map(op => op.color || theme.color)));
-
-    // 各グループで何番目のバブルかを表示するためのカウンター
     const colorCounters = {};
 
     opinions.forEach((op) => {
       const color = op.color || theme.color;
-
-      // この色が uniqueColors の何番目か（0, 1, 2）を確認
       const colorIndex = uniqueColors.indexOf(color);
-      const groupKey = `group${colorIndex % 2}`; // 2つ以上の色があっても0-1に丸める
-
-      // このグループで何回目の登場かをカウント
+      const groupKey = `group${colorIndex % 2}`;
       if (colorCounters[groupKey] === undefined) colorCounters[groupKey] = 0;
       const count = colorCounters[groupKey];
-
-      // パターンリストから縦位置を取得（リスト末尾を超えたらループ）
       const pattern = colorPatterns[groupKey];
       const topValue = pattern[count % pattern.length];
-
-      // 横位置（スコアベース）
       const range = isMobile ? 64 : 84;
       const offset = isMobile ? 18 : 8;
       const left = ((op.score + 100) / 200) * range + offset;
 
-      positions[op.id] = {
-        left: `${left}%`,
-        top: `${topValue}%`
-      };
-
-      // 次の同じ色のバブルのためにカウントアップ
+      positions[op.id] = { left: `${left}%`, top: `${topValue}%` };
       colorCounters[groupKey]++;
     });
-
     return positions;
   }, [opinions, isMobile, theme.color]);
 
-  // --- 以下、レンダリング部分は元のコードを維持 ---
   const range = isMobile ? 65 : 85;
   const offset = isMobile ? 18 : 8;
   const selfLeft = ((selfScore + 100) / 200) * range + offset;
 
   return (
-    <div className="detail-container" style={styles.detailContainer}>
+    <div className="detail-container" style={{
+      ...styles.detailContainer,
+      // ★反映: スマホ版のみ下部の余白を極小にして、バーを画面下端へ寄せる
+      paddingBottom: isMobile ? '5px' : '20px'
+    }}>
       <h2 className="theme-detail-title" style={{ ...styles.pageTitle, borderColor: theme.color }}>{theme.title}</h2>
 
       <div style={styles.bubblesArea}>
@@ -385,12 +355,14 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
             ...styles.selfBubble,
             left: `${selfLeft}%`,
             top: '95%',
-            width: isMobile ? '60px' : '80px',
-            height: isMobile ? '60px' : '80px',
+            // ★反映: スマホ版の自分バブルサイズを縮小 (60px -> 45px)
+            width: isMobile ? '45px' : '80px',
+            height: isMobile ? '45px' : '80px',
           }}
         >
-          <span style={{ fontSize: '0.7rem', display: 'block' }}>自分</span>
-          <span style={{ fontSize: '0.8rem' }}>{Math.round(selfScore)}</span>
+          {/* 文字サイズも調整 */}
+          <span style={{ fontSize: isMobile ? '0.6rem' : '0.7rem', display: 'block' }}>自分</span>
+          <span style={{ fontSize: isMobile ? '0.7rem' : '0.8rem' }}>{Math.round(selfScore)}</span>
         </div>
       </div>
 
