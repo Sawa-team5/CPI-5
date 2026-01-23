@@ -33,21 +33,21 @@ const useWindowSize = () => {
 
 const Frontend = ({ onLoginClick }) => {
   const [currentTheme, setCurrentTheme] = useState(null);
-  const [selfScore, setSelfScore] = useState(0); 
+  const [selfScore, setSelfScore] = useState(0);
   const [selectedOpinion, setSelectedOpinion] = useState(null);
   const [themes, setThemes] = useState([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [nickname, setNickname] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [startMessage, setStartMessage] = useState(null);
-  
+
   const initializedRef = useRef(false);
 
   // 画面サイズの取得
   const { isMobile: isSmallScreen } = useWindowSize();
-  
+
   // ★変更: レイアウト分岐用フラグは常にfalseにしてPCレイアウトを強制
-  const isMobileLayout = false; 
+  const isMobileLayout = false;
 
   useEffect(() => {
     const storedNickname = localStorage.getItem('nickname');
@@ -104,11 +104,11 @@ const Frontend = ({ onLoginClick }) => {
     if (userId) {
       try {
         const res = await fetch(`${API_BASE_URL}/stance/${theme.id}`, {
-            headers: { 'X-User-ID': userId }
+          headers: { 'X-User-ID': userId }
         });
         if (res.ok) {
-            const data = await res.json();
-            setSelfScore(data.stance_score || 0);
+          const data = await res.json();
+          setSelfScore(data.stance_score || 0);
         } else { setSelfScore(0); }
       } catch (e) { setSelfScore(0); }
     } else { setSelfScore(0); }
@@ -118,29 +118,29 @@ const Frontend = ({ onLoginClick }) => {
     if (!selectedOpinion) return;
     const userId = localStorage.getItem('userId');
     if (userId) {
-        try {
-            const res = await fetch(`${API_BASE_URL}/vote`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-User-ID': userId },
-                body: JSON.stringify({ 
-                    opinionId: selectedOpinion.id, 
-                    voteType: type,
-                    themeId: currentTheme.id
-                })
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setSelfScore(data.newScore);
-            }
-        } catch (e) { console.error("Vote failed", e); }
+      try {
+        const res = await fetch(`${API_BASE_URL}/vote`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-User-ID': userId },
+          body: JSON.stringify({
+            opinionId: selectedOpinion.id,
+            voteType: type,
+            themeId: currentTheme.id
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSelfScore(data.newScore);
+        }
+      } catch (e) { console.error("Vote failed", e); }
     }
 
-    const msgText = type === 'agree' 
-      ? `「${selectedOpinion.title}」という意見に賛成です。` 
+    const msgText = type === 'agree'
+      ? `「${selectedOpinion.title}」という意見に賛成です。`
       : `「${selectedOpinion.title}」という意見には反対です。懸念点があります。`;
-    
+
     setStartMessage({ text: msgText, id: Date.now() });
-    setSelectedOpinion(null); 
+    setSelectedOpinion(null);
     setIsChatOpen(true);
   };
 
@@ -153,16 +153,16 @@ const Frontend = ({ onLoginClick }) => {
       {/* サイドバー: PCレイアウトとして常に表示 */}
       <div className="app-sidebar" style={sidebarStyle}>
         <h3 style={styles.sidebarTitle}>Kaleidoscope</h3>
-        
-        <h4 style={{fontSize: '0.9rem', marginBottom: '10px', opacity: 0.8}}>テーマ一覧</h4>
+
+        <h4 style={{ fontSize: '0.9rem', marginBottom: '10px', opacity: 0.8 }}>テーマ一覧</h4>
         {isGenerating && themes.length === 0 && (
-          <div style={{color: '#fff', padding: '10px', fontSize: '0.8rem'}}>AIが話題を生成中...</div>
+          <div style={{ color: '#fff', padding: '10px', fontSize: '0.8rem' }}>AIが話題を生成中...</div>
         )}
 
         <ul className="theme-list" style={styles.themeList}>
           {themes.map(theme => (
-            <li 
-              key={theme.id} 
+            <li
+              key={theme.id}
               style={{
                 ...styles.themeItem,
                 backgroundColor: currentTheme?.id === theme.id ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)',
@@ -175,7 +175,7 @@ const Frontend = ({ onLoginClick }) => {
             </li>
           ))}
         </ul>
-        
+
         <div style={styles.userInfoArea}>
           {nickname ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
@@ -192,17 +192,17 @@ const Frontend = ({ onLoginClick }) => {
 
       <div className="app-main" style={styles.main}>
         {currentTheme ? (
-          <ThemeDetailView 
+          <ThemeDetailView
             theme={currentTheme}
             selfScore={selfScore}
             onOpinionClick={(op) => setSelectedOpinion(op)}
             isMobile={isSmallScreen} // バブルサイズの調整に使用
           />
         ) : (
-          <ThemeListView 
-            themes={themes} 
-            onThemeClick={handleThemeClick} 
-            isMobile={isSmallScreen} 
+          <ThemeListView
+            themes={themes}
+            onThemeClick={handleThemeClick}
+            isMobile={isSmallScreen}
           />
         )}
       </div>
@@ -218,7 +218,7 @@ const Frontend = ({ onLoginClick }) => {
               marginBottom: '15px'
             }}>{selectedOpinion.title}</h3>
             <p className="modal-body-text">{selectedOpinion.body}</p>
-            
+
             {selectedOpinion.sourceUrl && (
               <div style={styles.sourceLinkArea}>
                 <a href={selectedOpinion.sourceUrl} target="_blank" rel="noopener noreferrer" style={styles.sourceAnchor}>
@@ -239,13 +239,13 @@ const Frontend = ({ onLoginClick }) => {
       {!isChatOpen && (
         <div style={styles.chatToggle} onClick={() => setIsChatOpen(true)}>◀</div>
       )}
-      
-      <ChatMode 
-        isOpen={isChatOpen} 
-        onClose={() => { setIsChatOpen(false); setStartMessage(null); }} 
+
+      <ChatMode
+        isOpen={isChatOpen}
+        onClose={() => { setIsChatOpen(false); setStartMessage(null); }}
         currentTheme={currentTheme}
-        currentOpinion={selectedOpinion} 
-        initialMessage={startMessage} 
+        currentOpinion={selectedOpinion}
+        initialMessage={startMessage}
         isMobile={isSmallScreen}
       />
     </div>
@@ -263,7 +263,7 @@ const ThemeListView = ({ themes, onThemeClick, isMobile }) => (
         style={{
           ...styles.themeBubble,
           backgroundColor: theme.color || '#ccc',
-          left: `${20 + (index * 25)}%`,       
+          left: `${20 + (index * 25)}%`,
           top: `${30 + (index % 2 * 30)}%`,
           width: isMobile ? '120px' : '160px',
           height: isMobile ? '120px' : '160px',
@@ -295,33 +295,68 @@ const hexToRgba = (hex, alpha) => {
 };
 
 const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
-  const opinions = theme.opinions.slice(0, 5);
-  
+  const opinions = theme.opinions.slice(0, 10); // 表示件数を考慮
+
   const bubblePositions = useMemo(() => {
     const positions = {};
-    const Y_PATTERNS = [15, 75, 30, 60, 45]; 
-    opinions.forEach((op, index) => {
-        const score = op.score || 0;
-        const range = isMobile ? 64 : 84;
-        const offset = isMobile ? 18 : 8;
-        const left = ((score + 100) / 200) * range + offset;
-        positions[op.id] = { left: `${left}%`, top: `${Y_PATTERNS[index % Y_PATTERNS.length]}%` };
-    });
-    return positions;
-  }, [opinions, isMobile]);
 
+    // 1. 色ごとの縦位置リストを定義 (3グループ想定)
+    // グループごとの「高さの帯」を分けるイメージです
+    const colorPatterns = {
+      group0: [25, 55, 85], // 1つ目の色のy軸位置パターン
+      group1: [14, 40, 70], // 2つ目の色のy軸位置パターン
+    };
+
+    // 色をグループ（0, 1, 2）に割り当てるためのマップ
+    const uniqueColors = Array.from(new Set(opinions.map(op => op.color || theme.color)));
+
+    // 各グループで何番目のバブルかを表示するためのカウンター
+    const colorCounters = {};
+
+    opinions.forEach((op) => {
+      const color = op.color || theme.color;
+
+      // この色が uniqueColors の何番目か（0, 1, 2）を確認
+      const colorIndex = uniqueColors.indexOf(color);
+      const groupKey = `group${colorIndex % 2}`; // 2つ以上の色があっても0-1に丸める
+
+      // このグループで何回目の登場かをカウント
+      if (colorCounters[groupKey] === undefined) colorCounters[groupKey] = 0;
+      const count = colorCounters[groupKey];
+
+      // パターンリストから縦位置を取得（リスト末尾を超えたらループ）
+      const pattern = colorPatterns[groupKey];
+      const topValue = pattern[count % pattern.length];
+
+      // 横位置（スコアベース）
+      const range = isMobile ? 64 : 84;
+      const offset = isMobile ? 18 : 8;
+      const left = ((op.score + 100) / 200) * range + offset;
+
+      positions[op.id] = {
+        left: `${left}%`,
+        top: `${topValue}%`
+      };
+
+      // 次の同じ色のバブルのためにカウントアップ
+      colorCounters[groupKey]++;
+    });
+
+    return positions;
+  }, [opinions, isMobile, theme.color]);
+
+  // --- 以下、レンダリング部分は元のコードを維持 ---
   const range = isMobile ? 65 : 85;
   const offset = isMobile ? 18 : 8;
   const selfLeft = ((selfScore + 100) / 200) * range + offset;
 
   return (
     <div className="detail-container" style={styles.detailContainer}>
-      <h2 className="theme-detail-title" style={{...styles.pageTitle, borderColor: theme.color}}>{theme.title}</h2>
-      
+      <h2 className="theme-detail-title" style={{ ...styles.pageTitle, borderColor: theme.color }}>{theme.title}</h2>
+
       <div style={styles.bubblesArea}>
         {opinions.map((op) => {
           const pos = bubblePositions[op.id] || { top: '50%', left: '50%' };
-          // ★修正: ここに baseColor の定義がひつよう
           const baseColor = op.color || theme.color;
           return (
             <div
@@ -331,9 +366,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
                 ...styles.opinionBubble,
                 left: pos.left,
                 top: pos.top,
-                // 透明度0.85(85%)にして少し透けさせる
                 backgroundColor: hexToRgba(baseColor, 0.4),
-                // 透過しても輪郭がわかるように同色の枠線をつける
                 border: `1px solid ${baseColor}`,
                 width: isMobile ? '105px' : '150px',
                 height: isMobile ? '65px' : '80px',
@@ -345,33 +378,33 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
             </div>
           );
         })}
-        
+
         <div
           className="self-bubble"
           style={{
             ...styles.selfBubble,
             left: `${selfLeft}%`,
-            top: '95%', 
+            top: '95%',
             width: isMobile ? '60px' : '80px',
             height: isMobile ? '60px' : '80px',
           }}
         >
-          <span style={{fontSize: '0.7rem', display: 'block'}}>自分</span>
-          <span style={{fontSize: '0.8rem'}}>{Math.round(selfScore)}</span>
+          <span style={{ fontSize: '0.7rem', display: 'block' }}>自分</span>
+          <span style={{ fontSize: '0.8rem' }}>{Math.round(selfScore)}</span>
         </div>
       </div>
 
       <div className="axis-container" style={styles.axisContainer}>
         <div style={styles.axisLabelLeft}>
           <span className="axis-text">反対</span>
-          <span style={{fontSize: '0.7rem', opacity: 0.6}}>-100</span>
+          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>-100</span>
         </div>
         <div style={styles.axisLine}>
-            <div style={{ position: 'absolute', left: '50%', top: '-8px', width: '2px', height: '22px', backgroundColor: '#aaa' }}></div>
+          <div style={{ position: 'absolute', left: '50%', top: '-8px', width: '2px', height: '22px', backgroundColor: '#aaa' }}></div>
         </div>
         <div style={styles.axisLabelRight}>
           <span className="axis-text">賛成</span>
-          <span style={{fontSize: '0.7rem', opacity: 0.6}}>+100</span>
+          <span style={{ fontSize: '0.7rem', opacity: 0.6 }}>+100</span>
         </div>
       </div>
     </div>
@@ -395,7 +428,7 @@ const styles = {
   pageTitle: { fontSize: '1.8rem', marginBottom: '15px', color: '#333', borderLeft: '8px solid #ccc', paddingLeft: '15px' },
   bubblesArea: { flex: 1, position: 'relative', marginBottom: '30px' },
   opinionBubble: { position: 'absolute', borderRadius: '50%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '10px', cursor: 'pointer', boxShadow: '0 5px 15px rgba(0,0,0,0.15)', transform: 'translate(-50%, -50%)', zIndex: 2, color: '#333', fontWeight: 'bold' },
-  selfBubble: { position: 'absolute', borderRadius: '50%', backgroundColor: 'white', border: '3px solid #333', color: '#333', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', transform: 'translate(-50%, -50%)', zIndex: 3, boxShadow: '0 2px 5px rgba(0,0,0,0.2)', transition: 'left 0.5s ease-out'},
+  selfBubble: { position: 'absolute', borderRadius: '50%', backgroundColor: 'white', border: '3px solid #333', color: '#333', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', transform: 'translate(-50%, -50%)', zIndex: 3, boxShadow: '0 2px 5px rgba(0,0,0,0.2)', transition: 'left 0.5s ease-out' },
   axisContainer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '60px', width: '100%', padding: '0 10px' },
   axisLabelLeft: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
   axisLabelRight: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
