@@ -73,7 +73,7 @@ const HelpPage = () => {
     return (
         <div style={{
             /* 画面全体のパディング調整 */
-            padding: isMobile ? '10px' : '20px',
+            padding: isMobile ? '-4px' : '2px',
             fontSize: isMobile ? '1rem' : '1.2rem',
             maxWidth: '100%',
             margin: '0 auto',
@@ -93,7 +93,7 @@ const HelpPage = () => {
                 position: 'relative',
                 overflow: 'hidden',
                 /* 横幅：画面に対してスライド枠をどのくらいの幅で出すか */
-                width: isMobile ? '85%' : '80%', 
+                width: isMobile ? '90%' : '80%', 
                 /* ★重要：高さ調整
                    画像＋文字が入り切らない場合は、ここの数値を大きくしてください。
                    スマホ版(isMobile)とPC版で別々に指定できます。 */
@@ -101,7 +101,7 @@ const HelpPage = () => {
                 maxWidth: '800px',
                 margin: '0 auto',
                 borderRadius: '12px',
-                maxHeight: isMobile ? '220px' : '370px', // 高さを固定
+                maxHeight: isMobile ? '230px' : '370px', // 高さを固定
                 backgroundColor: '#f0f0f0', // スライドの背景色
                 boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
             }}>
@@ -124,13 +124,13 @@ const HelpPage = () => {
                                 alt={step.title}
                                 style={{
                                     /* コンテナの幅に対する画像の大きさ(%) */
-                                    width: isMobile ? '85%' : '75%', 
+                                    width: isMobile ? '95%' : '75%', 
                                     /* 画像が大きくなりすぎないよう制限（スマホ用） */
-                                    maxWidth: isMobile ? '240px' : '500px', 
+                                    maxWidth: isMobile ? '300px' : '500px', 
                                     height: 'auto',
                                     borderRadius: '8px',
                                     /* 画像と下の見出しの間の距離 */
-                                    marginBottom: isMobile ? '10px' : '-8px'
+                                    marginBottom: isMobile ? '-12px' : '-8px'
                                 }}
                             />
 
@@ -138,7 +138,7 @@ const HelpPage = () => {
                             <h2 style={{ 
                                 fontSize: isMobile ? '1.1rem' : '1.6rem', 
                                 color: '#444',
-                                marginBottom: '10px'
+                                marginBottom: '-12px'
                             }}>
                                 {step.title}
                             </h2>

@@ -334,7 +334,7 @@ const Frontend = ({ onLoginClick }) => {
               width: isSmallScreen ? '75vw' : '800px',
               maxHeight: '85vh',
               borderRadius: '12px',
-              padding: isSmallScreen ? '20px' : '40px',
+              padding: isSmallScreen ? '10px' : '40px',
               position: 'relative',
               overflowY: 'auto',
               boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
