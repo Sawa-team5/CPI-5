@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import dummyData from './dummyData.json';
 import ChatMode from './ChatMode';
+import HelpPage from './HelpPage';
 import { fetchThemes, createThemeByAI, API_BASE_URL } from './api_client';
 
 /**
@@ -40,6 +41,7 @@ const Frontend = ({ onLoginClick }) => {
   const [nickname, setNickname] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [startMessage, setStartMessage] = useState(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const initializedRef = useRef(false);
   const { isMobile: isSmallScreen } = useWindowSize();
@@ -143,22 +145,18 @@ const Frontend = ({ onLoginClick }) => {
     <div className="app-container" style={{ ...styles.container, flexDirection: 'row' }}>
       <div className="app-sidebar" style={{
         ...styles.sidebar,
-        // ★ ここで横幅を分岐させます
-        width: isSmallScreen ? '200px' : '230px'
+        width: isSmallScreen ? '200px' : '220px'
       }}>
         <h3 style={{
           ...styles.sidebarTitle,
-          // ★ ここでスマホ版(例: 1.2rem) と PC版(例: 2.2rem) を分けます
           fontSize: isSmallScreen ? '1.2rem' : '1.5rem'
         }}>
           Kaleidoscope
         </h3>
 
-        {/* クリックで初期画面に戻るナビゲーション */}
         <h4
           style={{
-            // ★ここを調整
-            fontSize: isSmallScreen ? '0.9rem' : '1.2rem', // PC用を 1.2rem などに拡大
+            fontSize: isSmallScreen ? '0.9rem' : '1.2rem',
             marginBottom: '13px',
             opacity: 0.8,
             cursor: 'pointer',
@@ -178,9 +176,7 @@ const Frontend = ({ onLoginClick }) => {
               key={theme.id}
               style={{
                 ...styles.themeItem,
-                /* ★ここを追加：スマホなら 1.0rem、PCなら 1.8rem（またはお好みのサイズ） */
                 fontSize: isSmallScreen ? '1.8rem' : '1.2rem',
-
                 backgroundColor: currentTheme?.id === theme.id ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.15)',
                 borderLeft: `5px solid ${theme.color || '#ccc'}`
               }}
@@ -192,20 +188,30 @@ const Frontend = ({ onLoginClick }) => {
           ))}
         </ul>
 
+        <h4
+          style={{
+            fontSize: isSmallScreen ? '0.9rem' : '1.2rem',
+            marginBottom: '13px',
+            opacity: 0.8,
+            cursor: 'pointer',
+            textDecoration: 'underline'
+          }}
+          onClick={() => setIsHelpOpen(true)}
+        >
+          ヘルプ
+        </h4>
+
         <div style={styles.userInfoArea}>
           {nickname ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {/* ニックネームのサイズ */}
               <span style={{ fontSize: isSmallScreen ? '0.85rem' : '1.2rem' }}>
                 Login: <strong>{nickname}</strong>
               </span>
-              {/* ログアウトボタンのサイズ */}
               <span onClick={handleLogout} style={{ ...styles.logoutLink, fontSize: isSmallScreen ? '0.75rem' : '1.2rem' }}>
                 ログアウト
               </span>
             </div>
           ) : (
-            /* 未ログイン時のテキストサイズ */
             <span onClick={onLoginClick} style={{ cursor: 'pointer', textDecoration: 'underline', fontSize: isSmallScreen ? '0.8rem' : '0.7rem' }}>
               ログイン / ユーザー切替
             </span>
@@ -230,7 +236,6 @@ const Frontend = ({ onLoginClick }) => {
         )}
       </div>
 
-      {/* ポップアップ（モーダル）修正版 */}
       {selectedOpinion && (
         <div className="modal-overlay" style={styles.modalOverlay} onClick={() => setSelectedOpinion(null)}>
           <div
@@ -307,6 +312,56 @@ const Frontend = ({ onLoginClick }) => {
         </div>
       )}
 
+      {isHelpOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 3500,
+          }}
+          onClick={() => setIsHelpOpen(false)}
+        >
+          <div
+            style={{
+              backgroundColor: 'white',
+              width: isSmallScreen ? '75vw' : '800px',
+              maxHeight: '85vh',
+              borderRadius: '12px',
+              padding: isSmallScreen ? '20px' : '40px',
+              position: 'relative',
+              overflowY: 'auto',
+              boxShadow: '0 10px 40px rgba(0,0,0,0.5)',
+              color: '#333'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setIsHelpOpen(false)}
+              style={{
+                position: 'absolute',
+                top: isSmallScreen ? '10px' : '20px',
+                right: isSmallScreen ? '10px' : '20px',
+                background: 'none',
+                border: 'none',
+                fontSize: '1.5rem',
+                cursor: 'pointer',
+                color: '#666'
+              }}
+            >
+              ✕
+            </button>
+            <HelpPage />
+          </div>
+        </div>
+      )}
+
       {!isChatOpen && (
         <div style={styles.chatToggle} onClick={() => setIsChatOpen(true)}>◀</div>
       )}
@@ -336,9 +391,9 @@ const ThemeListView = ({ themes, onThemeClick, isMobile }) => (
           backgroundColor: theme.color || '#ccc',
           left: `${20 + (index * 25)}%`,
           top: `${30 + (index % 2 * 30)}%`,
-          width: isMobile ? '120px' : '240px', // PC版テーマバブルを少し拡大
-          height: isMobile ? '120px' : '240px',
-          fontSize: isMobile ? '0.9rem' : '2.3rem', // PC版フォント拡大
+          width: isMobile ? '120px' : '220px',
+          height: isMobile ? '120px' : '220px',
+          fontSize: isMobile ? '0.9rem' : '2.1rem',
         }}
         onClick={() => onThemeClick(theme)}
       >
@@ -416,10 +471,9 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
                 top: pos.top,
                 backgroundColor: hexToRgba(baseColor, 0.4),
                 border: `1px solid ${baseColor}`,
-                // ★PC版のバブルサイズを大きく設定
-                width: isMobile ? '100px' : '250px',
-                height: isMobile ? '60px' : '170px',
-                fontSize: isMobile ? '0.75rem' : '1.1rem', // PC版フォント拡大
+                width: isMobile ? '100px' : '200px',
+                height: isMobile ? '60px' : '150px',
+                fontSize: isMobile ? '0.75rem' : '1.05rem',
               }}
               onClick={() => onOpinionClick(op)}
             >
@@ -433,9 +487,10 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
           style={{
             ...styles.selfBubble,
             left: `${selfLeft}%`,
-            top: isMobile ? '110%' : '103%',
-            width: isMobile ? '50px' : '60px', // 自分バブルもPCで拡大
+            top: isMobile ? '118%' : '103%',
+            width: isMobile ? '50px' : '60px',
             height: isMobile ? '50px' : '60px',
+            // ★ 修正箇所: isSmallScreen ではなく isMobile を使用
             border: isMobile ? '1px solid #333' : '3px solid #333',
             zIndex: 10,
           }}
@@ -452,7 +507,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
         <div style={styles.axisLabelLeft}>
           <span
             className="axis-text"
-            style={{ fontSize: isMobile ? '0.8rem' : '1.2rem' }} // スマホ0.8rem、PC1.2rem
+            style={{ fontSize: isMobile ? '0.8rem' : '1.2rem' }}
           >
             反対
           </span>
@@ -464,7 +519,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
         <div style={styles.axisLabelRight}>
           <span
             className="axis-text"
-            style={{ fontSize: isMobile ? '0.8rem' : '2.2rem' }} // スマホ0.8rem、PC1.2rem
+            style={{ fontSize: isMobile ? '0.8rem' : '2.2rem' }}
           >
             賛成
           </span>
@@ -475,10 +530,9 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
   );
 };
 
-// --- Styles (PC版の値を調整) ---
+// --- Styles ---
 const styles = {
   container: { display: 'flex', height: '100vh', fontFamily: '"Helvetica Neue", Arial, sans-serif', backgroundColor: '#f9f9f9', overflow: 'hidden' },
-  // ★サイドバーの幅を200pxから260pxに拡大
   sidebar: { width: '350px', backgroundColor: '#37474F', padding: '25px', color: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '2px 0 5px rgba(0,0,0,0.1)', zIndex: 10, flexShrink: 0 },
   sidebarTitle: { marginBottom: '25px', fontSize: '1.6rem', fontWeight: 'bold', letterSpacing: '1px' },
   themeList: { listStyle: 'none', padding: 0, flex: 1, overflowY: 'auto' },
