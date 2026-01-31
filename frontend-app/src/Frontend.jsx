@@ -27,7 +27,6 @@ const useWindowSize = () => {
   return {
     width: windowSize.width,
     height: windowSize.height,
-    // 横幅が768px未満、または高さが500px未満ならモバイル判定
     isMobile: windowSize.width < 768 || windowSize.height < 500,
   };
 };
@@ -42,6 +41,12 @@ const Frontend = ({ onLoginClick }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [startMessage, setStartMessage] = useState(null);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  // 投票済み意見IDリストの管理
+  const [votedOpinionIds, setVotedOpinionIds] = useState(() => {
+    const stored = localStorage.getItem('votedOpinionIds');
+    return stored ? JSON.parse(stored) : [];
+  });
 
   const initializedRef = useRef(false);
   const { isMobile: isSmallScreen } = useWindowSize();
@@ -91,7 +96,9 @@ const Frontend = ({ onLoginClick }) => {
     if (window.confirm("ログアウトしますか？")) {
       localStorage.removeItem('nickname');
       localStorage.removeItem('userId');
+      localStorage.removeItem('votedOpinionIds');
       setNickname('');
+      setVotedOpinionIds([]);
     }
   };
 
@@ -113,6 +120,14 @@ const Frontend = ({ onLoginClick }) => {
 
   const handleVote = async (type) => {
     if (!selectedOpinion) return;
+
+    // すでに投票済みならアラートを出して終了（念のための二重チェック）
+    if (votedOpinionIds.includes(selectedOpinion.id)) {
+      alert('この意見にはすでに投票済みです。');
+      setSelectedOpinion(null);
+      return;
+    }
+
     const userId = localStorage.getItem('userId');
     if (userId) {
       try {
@@ -128,6 +143,10 @@ const Frontend = ({ onLoginClick }) => {
         if (res.ok) {
           const data = await res.json();
           setSelfScore(data.newScore);
+
+          const newVoted = [...votedOpinionIds, selectedOpinion.id];
+          setVotedOpinionIds(newVoted);
+          localStorage.setItem('votedOpinionIds', JSON.stringify(newVoted));
         }
       } catch (e) { console.error("Vote failed", e); }
     }
@@ -204,15 +223,15 @@ const Frontend = ({ onLoginClick }) => {
         <div style={styles.userInfoArea}>
           {nickname ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <span style={{ fontSize: isSmallScreen ? '0.85rem' : '1.2rem' }}>
+              <span style={{ fontSize: isSmallScreen ? '0.85rem' : '1.0rem' }}>
                 Login: <strong>{nickname}</strong>
               </span>
-              <span onClick={handleLogout} style={{ ...styles.logoutLink, fontSize: isSmallScreen ? '0.75rem' : '1.2rem' }}>
+              <span onClick={handleLogout} style={{ ...styles.logoutLink, fontSize: isSmallScreen ? '0.75rem' : '0.8rem' }}>
                 ログアウト
               </span>
             </div>
           ) : (
-            <span onClick={onLoginClick} style={{ cursor: 'pointer', textDecoration: 'underline', fontSize: isSmallScreen ? '0.8rem' : '0.7rem' }}>
+            <span onClick={onLoginClick} style={{ cursor: 'pointer', textDecoration: 'underline', fontSize: isSmallScreen ? '0.8rem' : '0.9rem' }}>
               ログイン / ユーザー切替
             </span>
           )}
@@ -226,13 +245,10 @@ const Frontend = ({ onLoginClick }) => {
             selfScore={selfScore}
             onOpinionClick={(op) => setSelectedOpinion(op)}
             isMobile={isSmallScreen}
+            votedOpinionIds={votedOpinionIds}
           />
         ) : (
-          <ThemeListView
-            themes={themes}
-            onThemeClick={handleThemeClick}
-            isMobile={isSmallScreen}
-          />
+          <ThemeListView themes={themes} onThemeClick={handleThemeClick} isMobile={isSmallScreen} />
         )}
       </div>
 
@@ -282,6 +298,7 @@ const Frontend = ({ onLoginClick }) => {
               )}
             </div>
 
+            {/* ★修正箇所: 投票済みかどうかの条件分岐を追加 */}
             <div style={{
               marginTop: '20px',
               display: 'flex',
@@ -289,18 +306,35 @@ const Frontend = ({ onLoginClick }) => {
               gap: '12px',
               flexShrink: 0
             }}>
-              <button
-                style={{ ...styles.agreeButton, flex: 1, padding: isSmallScreen ? '10px' : '12px 25px' }}
-                onClick={() => handleVote('agree')}
-              >
-                👍 賛成して議論
-              </button>
-              <button
-                style={{ ...styles.opposeButton, flex: 1, padding: isSmallScreen ? '10px' : '12px 25px' }}
-                onClick={() => handleVote('oppose')}
-              >
-                👎 反対して議論
-              </button>
+              {votedOpinionIds.includes(selectedOpinion.id) ? (
+                <div style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  padding: '12px',
+                  backgroundColor: '#f0f0f0',
+                  color: '#888',
+                  borderRadius: '50px',
+                  fontWeight: 'bold',
+                  fontSize: '0.9rem'
+                }}>
+                  回答済みです
+                </div>
+              ) : (
+                <>
+                  <button
+                    style={{ ...styles.agreeButton, flex: 1, padding: isSmallScreen ? '10px' : '12px 25px' }}
+                    onClick={() => handleVote('agree')}
+                  >
+                    👍 賛成して議論
+                  </button>
+                  <button
+                    style={{ ...styles.opposeButton, flex: 1, padding: isSmallScreen ? '10px' : '12px 25px' }}
+                    onClick={() => handleVote('oppose')}
+                  >
+                    👎 反対して議論
+                  </button>
+                </>
+              )}
             </div>
             <button
               style={{ ...styles.closeButton, marginTop: '10px' }}
@@ -362,18 +396,8 @@ const Frontend = ({ onLoginClick }) => {
         </div>
       )}
 
-      {!isChatOpen && (
-        <div style={styles.chatToggle} onClick={() => setIsChatOpen(true)}>◀</div>
-      )}
-
-      <ChatMode
-        isOpen={isChatOpen}
-        onClose={() => { setIsChatOpen(false); setStartMessage(null); }}
-        currentTheme={currentTheme}
-        currentOpinion={selectedOpinion}
-        initialMessage={startMessage}
-        isMobile={isSmallScreen}
-      />
+      {!isChatOpen && <div style={styles.chatToggle} onClick={() => setIsChatOpen(true)}>◀</div>}
+      <ChatMode isOpen={isChatOpen} onClose={() => { setIsChatOpen(false); setStartMessage(null); }} currentTheme={currentTheme} currentOpinion={selectedOpinion} initialMessage={startMessage} isMobile={isSmallScreen} />
     </div>
   );
 };
@@ -405,50 +429,90 @@ const ThemeListView = ({ themes, onThemeClick, isMobile }) => (
 
 const hexToRgba = (hex, alpha) => {
   if (!hex) return `rgba(200, 200, 200, ${alpha})`;
-  let c = hex;
-  if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(c)) {
-    c = c.substring(1).split('');
-    if (c.length === 3) {
-      c = [c[0], c[0], c[1], c[1], c[2], c[2]];
-    }
-    c = '0x' + c.join('');
-    return 'rgba(' + [(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',') + ',' + alpha + ')';
-  }
-  return hex;
+  let c = hex.substring(1).split('');
+  if (c.length === 3) c = [c[0], c[0], c[1], c[1], c[2], c[2]];
+  c = '0x' + c.join('');
+  return `rgba(${[(c >> 16) & 255, (c >> 8) & 255, c & 255].join(',')},${alpha})`;
 };
 
-const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
+const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile, votedOpinionIds = [] }) => {
   const opinions = theme.opinions.slice(0, 10);
+  const BAR_RANGE = 88;
+  const OFFSET_LEFT = 6;
 
   const bubblePositions = useMemo(() => {
     const positions = {};
-    const colorPatterns = {
-      group0: [21, 51, 81],
-      group1: [15, 45, 70],
-    };
+    const colorPatterns = { group0: [21, 51, 81], group1: [15, 45, 70] };
     const uniqueColors = Array.from(new Set(opinions.map(op => op.color || theme.color)));
     const colorCounters = {};
+
+    const placedPositions = [];
 
     opinions.forEach((op) => {
       const color = op.color || theme.color;
       const colorIndex = uniqueColors.indexOf(color);
       const groupKey = `group${colorIndex % 2}`;
       if (colorCounters[groupKey] === undefined) colorCounters[groupKey] = 0;
+
       const count = colorCounters[groupKey];
       const pattern = colorPatterns[groupKey];
-      const topValue = pattern[count % pattern.length];
-      const range = isMobile ? 64 : 84;
-      const offset = isMobile ? 18 : 8;
-      const left = ((op.score + 100) / 200) * range + offset;
-      positions[op.id] = { left: `${left}%`, top: `${topValue}%` };
+
+      // 1. 初期座標の計算
+      let topValue = pattern[count % pattern.length];
+      const limitedOpScore = Math.max(-100, Math.min(100, op.score));
+      const leftValue = ((limitedOpScore + 100) / 200) * BAR_RANGE + OFFSET_LEFT;
+
+      // 中央付近（スコアの絶対値30未満）ならトピック名回避のため初期値を下げる
+      if (Math.abs(limitedOpScore) < 30) {
+        topValue += 15;
+      }
+
+      const isOverlapping = (l, t) => {
+        return placedPositions.some(pos =>
+          Math.abs(pos.left - l) < 15 && Math.abs(pos.top - t) < 15
+        );
+      };
+
+      // 2. 重なり回避
+      // 各ステップで50回ずつ試行合計150回の探索
+      const jumpSteps = [37, 23, 17];
+      let safetyCounter = 0;
+      let foundSpace = !isOverlapping(leftValue, topValue);
+
+      if (!foundSpace) {
+        for (const step of jumpSteps) {
+          for (let i = 0; i < 50; i++) {
+            safetyCounter++;
+            topValue = (topValue + step) % 100;
+
+            // 見切れ防止（15%〜85%の範囲に収める）
+            if (topValue < 15) topValue += 10;
+            if (topValue > 85) topValue -= 10;
+
+            if (!isOverlapping(leftValue, topValue)) {
+              foundSpace = true;
+              break;
+            }
+          }
+          if (foundSpace) break;
+        }
+      }
+
+      // 諦めログの出力
+      if (!foundSpace) {
+        console.warn(`[Kaleidoscope] 重なりが解消できませんでした。諦めます。対象意見: ${op.title}`);
+      }
+
+      // 3. 最終位置の確定
+      positions[op.id] = { left: `${leftValue}%`, top: `${topValue}%` };
+      placedPositions.push({ left: leftValue, top: topValue });
       colorCounters[groupKey]++;
     });
     return positions;
-  }, [opinions, isMobile, theme.color]);
+  }, [opinions, theme.color, BAR_RANGE, OFFSET_LEFT]);
 
-  const range = isMobile ? 65 : 85;
-  const offset = isMobile ? 18.7 : 7.2;
-  const selfLeft = ((selfScore + 100) / 200) * range + offset;
+  const limitedScore = Math.max(-100, Math.min(100, selfScore));
+  const selfLeft = ((limitedScore + 100) / 200) * BAR_RANGE + OFFSET_LEFT;
 
   return (
     <div className="detail-container" style={{
@@ -461,6 +525,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
         {opinions.map((op) => {
           const pos = bubblePositions[op.id] || { top: '50%', left: '50%' };
           const baseColor = op.color || theme.color;
+          const isVoted = votedOpinionIds.includes(op.id);
           return (
             <div
               key={op.id}
@@ -469,11 +534,13 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
                 ...styles.opinionBubble,
                 left: pos.left,
                 top: pos.top,
-                backgroundColor: hexToRgba(baseColor, 0.4),
+                backgroundColor: hexToRgba(baseColor, isVoted ? 0.15 : 0.4),
                 border: `1px solid ${baseColor}`,
                 width: isMobile ? '100px' : '200px',
                 height: isMobile ? '60px' : '150px',
                 fontSize: isMobile ? '0.75rem' : '1.05rem',
+                opacity: isVoted ? 0.6 : 1,
+                cursor: 'pointer'
               }}
               onClick={() => onOpinionClick(op)}
             >
@@ -488,42 +555,34 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
             ...styles.selfBubble,
             left: `${selfLeft}%`,
             top: isMobile ? '118%' : '103%',
-            width: isMobile ? '50px' : '60px',
-            height: isMobile ? '50px' : '60px',
-            // ★ 修正箇所: isSmallScreen ではなく isMobile を使用
+            width: isMobile ? '50px' : '65px',
+            height: isMobile ? '50px' : '65px',
             border: isMobile ? '1px solid #333' : '3px solid #333',
             zIndex: 10,
           }}
         >
-          <span style={{ fontSize: isMobile ? '0.7rem' : '1.0rem', display: 'block' }}>自分</span>
-          <span style={{ fontSize: isMobile ? '0.8rem' : '1.7rem' }}>{Math.round(selfScore)}</span>
+          <span style={{ fontSize: isMobile ? '0.6rem' : '0.8rem', display: 'block' }}>自分</span>
+          <span style={{ fontSize: isMobile ? '0.8rem' : '1.2rem' }}>{Math.round(selfScore)}</span>
         </div>
       </div>
 
       <div className="axis-container" style={{
         ...styles.axisContainer,
-        transform: isMobile ? 'translateY(12px)' : 'none'
+        transform: isMobile ? 'translateY(12px)' : 'none',
+        padding: 0
       }}>
-        <div style={styles.axisLabelLeft}>
-          <span
-            className="axis-text"
-            style={{ fontSize: isMobile ? '0.8rem' : '1.2rem' }}
-          >
-            反対
-          </span>
-          <span style={{ fontSize: isMobile ? '0.7rem' : '2.0rem', opacity: 0.6 }}>-100</span>
+        <div style={{ ...styles.axisLabelLeft, width: `${OFFSET_LEFT}%` }}>
+          <span className="axis-text" style={{ fontSize: isMobile ? '0.8rem' : '1.2rem' }}>反対</span>
+          <span style={{ fontSize: isMobile ? '0.7rem' : '0.9rem', opacity: 0.6, display: 'block' }}>-100</span>
         </div>
+
         <div style={styles.axisLine}>
           <div style={{ position: 'absolute', left: '50%', top: '-8px', width: '2px', height: '22px', backgroundColor: '#aaa' }}></div>
         </div>
-        <div style={styles.axisLabelRight}>
-          <span
-            className="axis-text"
-            style={{ fontSize: isMobile ? '0.8rem' : '2.2rem' }}
-          >
-            賛成
-          </span>
-          <span style={{ fontSize: isMobile ? '0.7rem' : '2.0rem', opacity: 0.6 }}>+100</span>
+
+        <div style={{ ...styles.axisLabelRight, width: `${OFFSET_LEFT}%` }}>
+          <span className="axis-text" style={{ fontSize: isMobile ? '0.8rem' : '1.2rem' }}>賛成</span>
+          <span style={{ fontSize: isMobile ? '0.7rem' : '0.9rem', opacity: 0.6, display: 'block' }}>+100</span>
         </div>
       </div>
     </div>
@@ -533,34 +592,35 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile }) => {
 // --- Styles ---
 const styles = {
   container: { display: 'flex', height: '100vh', fontFamily: '"Helvetica Neue", Arial, sans-serif', backgroundColor: '#f9f9f9', overflow: 'hidden' },
-  sidebar: { width: '350px', backgroundColor: '#37474F', padding: '25px', color: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '2px 0 5px rgba(0,0,0,0.1)', zIndex: 10, flexShrink: 0 },
-  sidebarTitle: { marginBottom: '25px', fontSize: '1.6rem', fontWeight: 'bold', letterSpacing: '1px' },
+  sidebar: { backgroundColor: '#37474F', padding: '25px', color: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '2px 0 5px rgba(0,0,0,0.1)', zIndex: 10, flexShrink: 0 },
+  sidebarTitle: { marginBottom: '25px', fontWeight: 'bold', letterSpacing: '1px' },
+  clickableMenu: { opacity: 0.8, cursor: 'pointer', textDecoration: 'underline', marginBottom: '13px' },
   themeList: { listStyle: 'none', padding: 0, flex: 1, overflowY: 'auto' },
-  themeItem: { padding: '14px 15px', marginBottom: '10px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '4px', fontSize: '1.8rem', transition: 'all 0.2s' },
+  themeItem: { padding: '12px 15px', marginBottom: '10px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderRadius: '4px', transition: 'all 0.2s' },
   arrow: { fontWeight: 'bold', fontSize: '0.8rem', opacity: 0.7 },
-  userInfoArea: { marginTop: 'auto', padding: '15px', backgroundColor: 'rgba(0, 0, 0, 0.2)', borderRadius: '6px', fontSize: '0.85rem', textAlign: 'center' },
-  logoutLink: { fontSize: '0.8rem', textDecoration: 'underline', cursor: 'pointer', color: '#ddd' },
+  userInfoArea: { marginTop: 'auto', padding: '15px', backgroundColor: 'rgba(0, 0, 0, 0.2)', borderRadius: '6px', textAlign: 'center' },
+  logoutLink: { textDecoration: 'underline', cursor: 'pointer', color: '#ddd' },
   main: { flex: 1, position: 'relative', backgroundColor: 'white', overflow: 'hidden', display: 'flex', flexDirection: 'column' },
-  bubbleContainer: { position: 'relative', width: '100%', height: '100%', overflow: 'hidden' },
-  themeBubble: { position: 'absolute', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 8px 15px rgba(0,0,0,0.1)', transform: 'translate(-50%, -50%)', color: '#fff', padding: '15px', textAlign: 'center', textShadow: '0 1px 2px rgba(0,0,0,0.3)' },
-  detailContainer: { padding: '30px', paddingBottom: '20px', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' },
+  bubbleContainer: { position: 'relative', width: '100%', height: '100%' },
+  themeBubble: { position: 'absolute', borderRadius: '50%', display: 'flex', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 8px 15px rgba(0,0,0,0.1)', transform: 'translate(-50%, -50%)', color: '#fff', textAlign: 'center' },
+  detailContainer: { padding: '30px', height: '100%', display: 'flex', flexDirection: 'column', position: 'relative' },
   pageTitle: { fontSize: '2.2rem', marginBottom: '20px', color: '#333', borderLeft: '10px solid #ccc', paddingLeft: '20px' },
   bubblesArea: { flex: 1, position: 'relative', marginBottom: '30px' },
   opinionBubble: { position: 'absolute', borderRadius: '50%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', padding: '15px', cursor: 'pointer', boxShadow: '0 5px 15px rgba(0,0,0,0.15)', transform: 'translate(-50%, -50%)', zIndex: 2, color: '#333', fontWeight: 'bold' },
-  selfBubble: { position: 'absolute', borderRadius: '50%', backgroundColor: 'white', color: '#333', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', transform: 'translate(-50%, -50%)', zIndex: 3, boxShadow: '0 2px 5px rgba(0,0,0,0.2)', transition: 'left 0.5s ease-out' },
-  axisContainer: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: '70px', width: '100%', padding: '0 10px' },
-  axisLabelLeft: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
-  axisLabelRight: { fontWeight: 'bold', color: '#555', textAlign: 'center' },
-  axisLine: { flex: 1, height: '4px', backgroundColor: '#eee', position: 'relative', margin: '0 15px', borderRadius: '2px' },
-  sourceLinkArea: { margin: '10px 0', textAlign: 'right' },
-  sourceAnchor: { fontSize: '0.8rem', color: '#007bff', textDecoration: 'none' },
-  buttonGroup: { display: 'flex', justifyContent: 'center', gap: '15px', margin: '20px 0' },
-  agreeButton: { padding: '12px 25px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '50px', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' },
-  opposeButton: { padding: '12px 25px', backgroundColor: '#E53935', color: 'white', border: 'none', borderRadius: '50px', cursor: 'pointer', fontSize: '1rem', fontWeight: 'bold' },
-  closeButton: { padding: '8px 20px', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '50px', cursor: 'pointer', color: '#666' },
-  chatToggle: { position: 'fixed', right: 0, top: '50%', transform: 'translateY(-50%)', width: '35px', height: '70px', backgroundColor: '#263238', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', borderTopLeftRadius: '10px', borderBottomLeftRadius: '10px', zIndex: 999 },
+  selfBubble: { position: 'absolute', borderRadius: '50%', backgroundColor: 'white', color: '#333', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', fontWeight: 'bold', transform: 'translate(-50%, -50%)', zIndex: 3, boxShadow: '0 2px 10px rgba(0,0,0,0.3)', transition: 'left 0.5s ease-out' },
+  axisContainer: { display: 'flex', alignItems: 'center', justifyContent: 'center', height: '70px', width: '100%', padding: '0' },
+  axisLabelLeft: { fontWeight: 'bold', color: '#555', textAlign: 'right', paddingRight: '15px', flexShrink: 0 },
+  axisLabelRight: { fontWeight: 'bold', color: '#555', textAlign: 'left', paddingLeft: '15px', flexShrink: 0 },
+  axisLine: { flex: 1, height: '4px', backgroundColor: '#eee', position: 'relative', borderRadius: '2px' },
   modalOverlay: { position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 },
-  modalContent: { backgroundColor: 'white', borderRadius: '15px', boxShadow: '0 10px 30px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column' },
+  modalContent: { backgroundColor: 'white', borderRadius: '15px', boxShadow: '0 10px 30px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', position: 'relative' },
+  modalTitle: { color: '#333', borderLeft: '6px solid #ccc', paddingLeft: '12px', marginBottom: '15px' },
+  modalButtons: { display: 'flex', gap: '15px', marginTop: '20px' },
+  agreeButton: { flex: 1, padding: '12px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '50px', cursor: 'pointer', fontWeight: 'bold' },
+  opposeButton: { flex: 1, padding: '12px', backgroundColor: '#E53935', color: 'white', border: 'none', borderRadius: '50px', cursor: 'pointer', fontWeight: 'bold' },
+  closeButton: { marginTop: '15px', padding: '8px', backgroundColor: '#f0f0f0', border: 'none', borderRadius: '50px', cursor: 'pointer' },
+  modalCloseX: { position: 'absolute', top: '15px', right: '15px', background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer' },
+  chatToggle: { position: 'fixed', right: 0, top: '50%', transform: 'translateY(-50%)', width: '35px', height: '70px', backgroundColor: '#263238', color: 'white', display: 'flex', justifyContent: 'center', alignItems: 'center', cursor: 'pointer', borderTopLeftRadius: '10px', borderBottomLeftRadius: '10px', zIndex: 999 },
 };
 
 export default Frontend;
