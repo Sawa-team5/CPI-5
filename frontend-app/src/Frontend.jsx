@@ -164,7 +164,7 @@ const Frontend = ({ onLoginClick }) => {
     <div className="app-container" style={{ ...styles.container, flexDirection: 'row' }}>
       <div className="app-sidebar" style={{
         ...styles.sidebar,
-        width: isSmallScreen ? '200px' : '220px'
+        width: isSmallScreen ? '200px' : '250px'
       }}>
         <h3 style={{
           ...styles.sidebarTitle,
@@ -462,8 +462,9 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile, votedOpin
       const limitedOpScore = Math.max(-100, Math.min(100, op.score));
       const leftValue = ((limitedOpScore + 100) / 200) * BAR_RANGE + OFFSET_LEFT;
 
-      // 中央付近（スコアの絶対値30未満）ならトピック名回避のため初期値を下げる
-      if (Math.abs(limitedOpScore) < 30) {
+      // ★修正箇所: 中央付近かつ「上半分」にある場合のみ、トピック名回避のため初期値を下げる
+      // 画面上部が0%のため、topValue < 50 が上半分に相当します
+      if (Math.abs(limitedOpScore) < 30 && topValue < 50) {
         topValue += 15;
       }
 
@@ -498,7 +499,7 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile, votedOpin
         }
       }
 
-      // 諦めログの出力
+      // 諦め
       if (!foundSpace) {
         console.warn(`[Kaleidoscope] 重なりが解消できませんでした。諦めます。対象意見: ${op.title}`);
       }
@@ -537,8 +538,8 @@ const ThemeDetailView = ({ theme, selfScore, onOpinionClick, isMobile, votedOpin
                 backgroundColor: hexToRgba(baseColor, isVoted ? 0.15 : 0.4),
                 border: `1px solid ${baseColor}`,
                 width: isMobile ? '100px' : '200px',
-                height: isMobile ? '60px' : '150px',
-                fontSize: isMobile ? '0.75rem' : '1.05rem',
+                height: isMobile ? '60px' : '130px',
+                fontSize: isMobile ? '0.75rem' : '1.15rem',
                 opacity: isVoted ? 0.6 : 1,
                 cursor: 'pointer'
               }}
